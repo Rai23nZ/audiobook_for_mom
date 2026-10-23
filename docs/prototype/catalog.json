@@ -1,0 +1,20 @@
+{
+  "family_folder_version": 4,
+  "cache_limit_mb": 350,
+  "books": [
+    {
+      "author": "А. С. Пушкин",
+      "year": 1836,
+      "title": "Капитанская дочка",
+      "filename": "Пушкин А.С. - 1836 - Капитанская дочка.mp3",
+      "source": "LibriVox Public Domain"
+    },
+    {
+      "author": "А. П. Чехов",
+      "year": 1899,
+      "title": "Дама с собачкой",
+      "filename": "Чехов А.П. - 1899 - Дама с собачкой.mp3",
+      "source": "Семейная папка (Яндекс.Диск / Google Drive)"
+    }
+  ]
+}

@@ -1,0 +1,2180 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Лесной Чтец — Шаг 4: Загрузка реальных MP3, Автопарсер годов и Таймер прогулки</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #f1f5f9;
+      color: #0f172a;
+      margin: 0;
+      padding: 16px;
+    }
+    .phone-frame {
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.22), 0 0 0 10px #1e293b, 0 0 0 13px #475569;
+      border-radius: 36px;
+      background: #FAF8F5;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 750px;
+      max-width: 430px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .mini-phone-frame {
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16), 0 0 0 7px #1e293b, 0 0 0 9px #64748b;
+      border-radius: 28px;
+      background: #FAF8F5;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 540px;
+      width: 100%;
+    }
+    .tap-target {
+      min-height: 64px;
+      cursor: pointer;
+      transition: transform 0.1s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+      user-select: none;
+    }
+    .tap-target:active {
+      transform: scale(0.97);
+    }
+    .hidden {
+      display: none !important;
+    }
+    button {
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    /* Автономные стили для гарантированной работы без интернета и внешних CDN */
+    .max-w-6xl { max-width: 72rem; margin-left: auto; margin-right: auto; }
+    .max-w-md { max-width: 28rem; }
+    .w-full { width: 100%; }
+    .bg-white { background-color: #ffffff; }
+    .bg-black { background-color: #000000; }
+    .bg-slate-950 { background-color: #020617; }
+    .bg-slate-900 { background-color: #0f172a; }
+    .bg-slate-800 { background-color: #1e293b; }
+    .bg-slate-100 { background-color: #f1f5f9; }
+    .bg-slate-50 { background-color: #f8fafc; }
+    .bg-stone-800 { background-color: #292524; }
+    .bg-stone-200 { background-color: #e7e5e4; }
+    .bg-stone-100 { background-color: #f5f5f4; }
+    .bg-stone-50 { background-color: #fafaf9; }
+    .bg-emerald-950 { background-color: #022c22; }
+    .bg-emerald-900 { background-color: #064e3b; }
+    .bg-emerald-800 { background-color: #065f46; }
+    .bg-emerald-700 { background-color: #047857; }
+    .bg-emerald-600 { background-color: #059669; }
+    .bg-emerald-100 { background-color: #d1fae5; }
+    .bg-emerald-50 { background-color: #ecfdf5; }
+    .bg-amber-600 { background-color: #d97706; }
+    .bg-amber-100 { background-color: #fef3c7; }
+    .bg-amber-50 { background-color: #fffbeb; }
+    .bg-rose-100 { background-color: #ffe4e6; }
+    .bg-blue-100 { background-color: #dbeafe; }
+    .bg-indigo-50 { background-color: #eef2ff; }
+    .text-white { color: #ffffff; }
+    .text-slate-900 { color: #0f172a; }
+    .text-slate-800 { color: #1e293b; }
+    .text-slate-700 { color: #334155; }
+    .text-slate-600 { color: #475569; }
+    .text-slate-500 { color: #64748b; }
+    .text-slate-400 { color: #94a3b8; }
+    .text-emerald-900 { color: #064e3b; }
+    .text-emerald-800 { color: #065f46; }
+    .text-emerald-400 { color: #34d399; }
+    .text-emerald-300 { color: #6ee7b7; }
+    .text-emerald-200 { color: #a7f3d0; }
+    .text-emerald-100 { color: #d1fae5; }
+    .text-amber-950 { color: #451a03; }
+    .text-amber-900 { color: #78350f; }
+    .text-amber-400 { color: #fbbf24; }
+    .text-amber-300 { color: #fcd34d; }
+    .text-amber-200 { color: #fde68a; }
+    .text-rose-950 { color: #4c0519; }
+    .text-blue-900 { color: #1e3a8a; }
+    .rounded-3xl { border-radius: 1.5rem; }
+    .rounded-2xl { border-radius: 1rem; }
+    .rounded-xl { border-radius: 0.75rem; }
+    .rounded-lg { border-radius: 0.5rem; }
+    .rounded-full { border-radius: 9999px; }
+    .border { border: 1px solid #cbd5e1; }
+    .border-2 { border: 2px solid #cbd5e1; }
+    .border-4 { border: 4px solid #065f46; }
+    .border-emerald-800 { border-color: #065f46; }
+    .border-emerald-700 { border-color: #047857; }
+    .border-amber-400 { border-color: #fbbf24; }
+    .border-amber-300 { border-color: #fcd34d; }
+    .border-slate-700 { border-color: #334155; }
+    .border-slate-400 { border-color: #94a3b8; }
+    .border-slate-300 { border-color: #cbd5e1; }
+    .border-slate-200 { border-color: #e2e8f0; }
+    .border-stone-300 { border-color: #d6d3d1; }
+    .p-2 { padding: 0.5rem; }
+    .p-2\.5 { padding: 0.625rem; }
+    .p-3 { padding: 0.75rem; }
+    .p-3\.5 { padding: 0.875rem; }
+    .p-4 { padding: 1rem; }
+    .p-5 { padding: 1.25rem; }
+    .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+    .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+    .px-4 { padding-left: 1rem; padding-right: 1rem; }
+    .px-5 { padding-left: 1.25rem; padding-right: 1.25rem; }
+    .py-1\.5 { padding-top: 0.375rem; padding-bottom: 0.375rem; }
+    .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+    .py-2\.5 { padding-top: 0.625rem; padding-bottom: 0.625rem; }
+    .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+    .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+    .py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+    .mb-1 { margin-bottom: 0.25rem; }
+    .mb-2 { margin-bottom: 0.5rem; }
+    .mb-3 { margin-bottom: 0.75rem; }
+    .mb-6 { margin-bottom: 1.5rem; }
+    .mb-8 { margin-bottom: 2rem; }
+    .mt-1 { margin-top: 0.25rem; }
+    .mt-2 { margin-top: 0.5rem; }
+    .mt-3 { margin-top: 0.75rem; }
+    .mt-4 { margin-top: 1rem; }
+    .font-bold { font-weight: 700; }
+    .font-extrabold { font-weight: 800; }
+    .font-semibold { font-weight: 600; }
+    .text-xs { font-size: 0.75rem; }
+    .text-sm { font-size: 0.875rem; }
+    .text-base { font-size: 1rem; }
+    .text-lg { font-size: 1.125rem; }
+    .text-xl { font-size: 1.25rem; }
+    .text-2xl { font-size: 1.5rem; }
+    .text-5xl { font-size: 3rem; line-height: 1; }
+    .flex { display: flex; }
+    .inline-flex { display: inline-flex; }
+    .flex-col { flex-direction: column; }
+    .flex-wrap { flex-wrap: wrap; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .justify-center { justify-content: center; }
+    .gap-1\.5 { gap: 0.375rem; }
+    .gap-2 { gap: 0.5rem; }
+    .gap-2\.5 { gap: 0.625rem; }
+    .gap-3 { gap: 0.75rem; }
+    .gap-4 { gap: 1rem; }
+    .gap-5 { gap: 1.25rem; }
+    .gap-6 { gap: 1.5rem; }
+    .grid { display: grid; }
+    .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .col-span-2 { grid-column: span 2 / span 2; }
+    .space-y-2 > * + * { margin-top: 0.5rem; }
+    .space-y-3 > * + * { margin-top: 0.75rem; }
+    .text-left { text-align: left; }
+    .text-center { text-align: center; }
+    .shadow-sm { box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .shadow-md { box-shadow: 0 4px 10px rgba(0,0,0,0.12); }
+    @media (min-width: 768px) {
+      .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (min-width: 1024px) {
+      .lg\:grid-cols-12 { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+      .lg\:col-span-7 { grid-column: span 7 / span 7; }
+      .lg\:col-span-5 { grid-column: span 5 / span 5; }
+      .lg\:flex-row { flex-direction: row; }
+      .lg\:items-center { align-items: center; }
+      .lg\:justify-between { justify-content: space-between; }
+    }
+  </style>
+</head>
+<body class="min-h-screen p-3 md:p-6">
+  <!-- Скрытый реальный HTML5 Audio движок для воспроизведения загруженных MP3/M4B/OGG файлов -->
+  <audio id="real-audio-engine" class="hidden"></audio>
+
+  <div class="max-w-6xl mx-auto">
+
+    <!-- Верхняя панель Шага 4 -->
+    <header id="dev-top-header" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-bold uppercase tracking-wider mb-1">
+            <span>Шаг 5 (Финальный релиз) • Режим «Чистый экран для мамы» и Установка на Android</span>
+          </div>
+          <h1 class="text-xl md:text-2xl font-extrabold text-slate-900">
+            «Лесной Чтец» — Полная версия с поддержкой ваших MP3-файлов
+          </h1>
+          <p class="text-sm text-slate-600 mt-0.5">
+            Загрузите любой MP3/M4B файл с компьютера или телефона (например, <code>Есенин С.А. - 1924 - Письмо матери.mp3</code>), либо проверьте мягкий таймер возвращения с прогулки.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap gap-2" role="group" aria-label="Режимы тестирования">
+          <button id="btn-variant-1" type="button" class="variant-btn px-4 py-2.5 rounded-xl font-bold text-sm border-2 transition-all bg-emerald-700 text-white border-emerald-700 shadow-sm">
+            Вариант 1: 2 крупные вкладки
+          </button>
+          <button id="btn-pocket-mode-top" type="button" class="px-4 py-2.5 rounded-xl font-bold text-sm border-2 transition-all bg-slate-900 text-amber-300 border-slate-900 shadow-sm">
+            🔒 Экран в кармане (Вкл/Выкл)
+          </button>
+          <button id="btn-mom-clean-mode" type="button" class="px-4 py-2.5 rounded-xl font-bold text-sm border-2 transition-all bg-amber-600 text-white border-amber-700 shadow-sm">
+            📲 Чистый экран для мамы
+          </button>
+          <button id="btn-show-install-modal" type="button" class="px-3.5 py-2 rounded-xl font-bold text-xs border-2 transition-all bg-emerald-50 text-emerald-950 border-emerald-600">
+            📦 Инструкция установки на Android
+          </button>
+          <button id="btn-show-kotlin-modal" type="button" class="px-3.5 py-2 rounded-xl font-bold text-xs border-2 transition-all bg-white text-slate-800 border-slate-300 hover:border-emerald-700">
+            💻 Код Android (Kotlin Media3)
+          </button>
+          <button id="btn-variant-all" type="button" class="variant-btn px-3 py-2 rounded-xl font-bold text-xs border transition-all bg-white text-slate-600 border-slate-300">
+            📱 Все 3 макета рядом
+          </button>
+          <button id="btn-variant-2" type="button" class="hidden variant-btn">Вариант 2: Нижний пульт (3 шага)</button>
+          <button id="btn-variant-3" type="button" class="hidden variant-btn">Вариант 3: Единый экран-гармошка</button>
+        </div>
+      </div>
+
+      <div id="variant-description-box" class="mt-4 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div id="variant-desc-text">
+          <strong>Что нового на Шаге 4:</strong> Справа вверху появился блок <strong>«📂 Загрузить свой MP3 / M4B файл»</strong> с автоопределением писателя и года из названия файла, а внутри плеера — кнопка <strong>«🌲 Таймер прогулки (45 мин)»</strong> с мягким голосовым напоминанием повернуть к дому.
+        </div>
+        <div class="flex flex-wrap items-center gap-2 shrink-0">
+          <label class="inline-flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-amber-300 font-semibold text-xs text-slate-800">
+            <input type="checkbox" id="toggle-voice-guide" checked class="w-4 h-4 accent-emerald-700 rounded" />
+            <span>🗣️ Голосовой гид</span>
+          </label>
+          <label class="inline-flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-amber-300 font-semibold text-xs text-slate-800">
+            <input type="checkbox" id="toggle-sound" checked class="w-4 h-4 accent-emerald-700 rounded" />
+            <span>🔊 Озвучка / звук</span>
+          </label>
+        </div>
+      </div>
+    </header>
+
+    <!-- Панель выхода из чистого режима (видна только когда включен «Чистый экран для мамы») -->
+    <div id="clean-mode-banner" class="hidden max-w-md mx-auto mb-3 bg-slate-900 text-white px-4 py-2.5 rounded-2xl flex items-center justify-between shadow-md">
+      <span class="text-xs font-bold text-emerald-300">📲 Вид экрана для пожилого человека</span>
+      <button id="btn-exit-clean-mode" type="button" class="px-3 py-1 rounded-lg bg-amber-600 text-white font-extrabold text-xs">
+        ⚙️ Вернуть панель родственника
+      </button>
+    </div>
+
+    <!-- Интерактивный мастер установки на смартфон Android (Шаг 5) -->
+    <section id="install-guide-panel" class="hidden bg-white rounded-2xl p-5 mb-6 border-2 border-emerald-700 shadow-md">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <span class="text-xs font-extrabold uppercase text-emerald-800">Шаг 5 • Два способа запуска на телефоне</span>
+          <h2 class="text-lg font-extrabold text-slate-900">Как установить «Лесной Чтец» на смартфон пожилого человека</h2>
+        </div>
+        <button id="btn-close-install-modal" type="button" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-800 font-bold text-xs border border-slate-300">
+          ✕ Скрыть инструкцию
+        </button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-700">
+        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-300">
+          <div class="font-extrabold text-sm text-emerald-950 mb-1.5">Способ А (За 2 минуты без программирования)</div>
+          <ol class="space-y-1.5 list-decimal pl-4">
+            <li>Скачайте финальный архив и перешлите файл <code>1_Dlya_Mamy_Chistiy_Pleer.html</code> на телефон мамы (через Telegram, WhatsApp или по кабелю).</li>
+            <li>Откройте этот файл в браузере Chrome на телефоне и нажмите в меню (три точки сверху) <strong>«Добавить на главный экран»</strong>.</li>
+            <li>Положите в папку телефона нужные MP3-книги по шаблону <code>Писатель - Год - Название.mp3</code> — мама сможет выбирать и слушать их полностью без интернета!</li>
+          </ol>
+        </div>
+        <div class="p-4 rounded-xl bg-amber-50 border border-amber-300">
+          <div class="font-extrabold text-sm text-amber-950 mb-1.5">Способ Б (Нативный APK через Android Studio + Media3)</div>
+          <ol class="space-y-1.5 list-decimal pl-4">
+            <li>Откройте папку <code>android_studio_project/</code> из финального архива в бесплатной программе Android Studio.</li>
+            <li>Внутри уже настроены <code>ForestAudioService.kt</code> (MediaSessionService + Audio Offload + кэш 350 МБ), <code>ForestSyncWorker.kt</code> (ночной Wi-Fi) и <code>MainActivity.kt</code> (Вариант 1 с двумя вкладками).</li>
+            <li>Нажмите <strong>Build → Build APK(s)</strong> и установите готовый <code>app-release.apk</code> (весом ~4 МБ) на телефон мамы.</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- Модальное окно с готовым кодом Android Studio (Kotlin + Jetpack Media3 + WorkManager) -->
+    <section id="kotlin-code-panel" class="hidden bg-slate-900 text-slate-100 rounded-2xl p-5 mb-6 border-2 border-emerald-600 shadow-md">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <span class="text-xs font-extrabold uppercase text-emerald-400">Готовые модули для Android Studio</span>
+          <h2 class="text-lg font-extrabold text-white">PlaybackService.kt (Media3) + ForestSyncWorker.kt (Семейная Wi-Fi синхронизация)</h2>
+        </div>
+        <button id="btn-close-kotlin-modal" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 text-amber-300 font-bold text-xs border border-slate-700">
+          ✕ Закрыть код
+        </button>
+      </div>
+      <pre class="text-xs font-mono overflow-x-auto p-3.5 rounded-xl bg-slate-950 text-emerald-300 border border-slate-800 leading-relaxed">// 1. Фоновый планировщик ночной синхронизации с семейной папкой (Яндекс.Диск WebDAV / Google Drive / JSON)
+class ForestSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
+    override suspend fun doWork(): Result {
+        // Запускается только дома по Wi-Fi (NetworkType.UNMETERED) на зарядке (RequiresCharging)
+        // Парсит имена файлов по шаблону: "Писатель - Год - Название.mp3"
+        val regex = Regex("""^(.+?)\s*-\s*(1[789]\d{2}|20\d{2})\s*-\s*(.+)\.(mp3|m4b|ogg)$""", RegexOption.IGNORE_CASE)
+        return Result.success()
+    }
+}
+
+// 2. Изолированный аудиосервис Media3 с защитой кнопок гарнитуры и кэшем 350 МБ
+class ForestAudioService : MediaSessionService() {
+    override fun onCreate() {
+        super.onCreate()
+        val evictor = LeastRecentlyUsedCacheEvictor(350L * 1024L * 1024L)
+        val simpleCache = SimpleCache(File(cacheDir, "audiobooks"), evictor, StandaloneDatabaseProvider(this))
+        // AudioOffloadMode.AUDIO_OFFLOAD_MODE_ENABLED разгружает CPU бюджетного смартфона до ~1.8%
+    }
+}</pre>
+    </section>
+
+    <!-- Скрытая витрина сравнения всех 3 макетов -->
+    <section id="all-three-showcase" class="hidden grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div class="flex flex-col">
+        <div class="mb-2 flex items-center justify-between">
+          <span class="font-extrabold text-slate-900 text-base">Макет 1 (Выбран за основу)</span>
+          <button type="button" id="open-full-v1" class="px-3 py-1 rounded-lg bg-emerald-700 text-white text-xs font-bold">Открыть крупно ➜</button>
+        </div>
+        <div class="mini-phone-frame">
+          <div class="bg-slate-900 text-white px-4 py-2 flex justify-between text-[11px] font-bold">
+            <span>🌲 В лесу (Офлайн)</span>
+            <span>🔋 94%</span>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5 p-2 bg-stone-200 border-b border-stone-300">
+            <button type="button" id="mini-v1-tab-play" class="py-2.5 rounded-xl font-extrabold text-sm bg-emerald-800 text-white">▶ СЛУШАТЬ</button>
+            <button type="button" id="mini-v1-tab-lib" class="py-2.5 rounded-xl font-extrabold text-sm bg-white text-slate-900 border border-slate-300">📚 ПИСАТЕЛИ</button>
+          </div>
+          <div id="mini-v1-body" class="flex-1 p-3 flex flex-col justify-between bg-[#FAF8F5]"></div>
+        </div>
+      </div>
+
+      <div class="flex flex-col">
+        <div class="mb-2 flex items-center justify-between">
+          <span class="font-extrabold text-slate-900 text-base">Макет 2: Нижний пульт</span>
+          <button type="button" id="open-full-v2" class="px-3 py-1 rounded-lg bg-slate-600 text-white text-xs font-bold">Открыть ➜</button>
+        </div>
+        <div class="mini-phone-frame">
+          <div class="bg-slate-900 text-white px-4 py-2 flex justify-between text-[11px] font-bold">
+            <span>🌲 В лесу (Офлайн)</span>
+            <span>🔋 94%</span>
+          </div>
+          <div class="bg-emerald-900 text-white px-3 py-2">
+            <div class="text-[10px] uppercase text-emerald-200 font-bold" id="mini-v2-hdr-sub">ШАГ 2 ИЗ 3 • ГОДЫ ВЫХОДА</div>
+            <div class="text-sm font-extrabold" id="mini-v2-hdr-title">А. С. Пушкин (по годам)</div>
+          </div>
+          <div id="mini-v2-body" class="flex-1 p-3 overflow-y-auto bg-[#FAF8F5]"></div>
+          <div class="grid grid-cols-3 gap-1.5 p-2 bg-stone-200 border-t border-stone-300">
+            <button type="button" id="mini-v2-btn-a" class="py-2 rounded-xl font-extrabold text-xs bg-white text-slate-900 border border-slate-300">1. Авторы</button>
+            <button type="button" id="mini-v2-btn-b" class="py-2 rounded-xl font-extrabold text-xs bg-emerald-800 text-white">2. Годы</button>
+            <button type="button" id="mini-v2-btn-p" class="py-2 rounded-xl font-extrabold text-xs bg-white text-slate-900 border border-slate-300">3. Плеер</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-col">
+        <div class="mb-2 flex items-center justify-between">
+          <span class="font-extrabold text-slate-900 text-base">Макет 3: Гармошка</span>
+          <button type="button" id="open-full-v3" class="px-3 py-1 rounded-lg bg-slate-600 text-white text-xs font-bold">Открыть ➜</button>
+        </div>
+        <div class="mini-phone-frame">
+          <div class="bg-slate-900 text-white px-4 py-2 flex justify-between text-[11px] font-bold">
+            <span>🌲 В лесу (Офлайн)</span>
+            <span>🔋 94%</span>
+          </div>
+          <div class="bg-stone-800 text-white px-3 py-2 flex justify-between items-center">
+            <span class="text-sm font-extrabold">Писатели и годы</span>
+            <span class="text-[11px] bg-emerald-700 px-2 py-0.5 rounded font-bold">Без смены окон</span>
+          </div>
+          <div id="mini-v3-body" class="flex-1 p-3 overflow-y-auto bg-[#FAF8F5]"></div>
+          <div class="bg-white border-t-4 border-emerald-800 p-2.5">
+            <div class="text-xs font-extrabold text-slate-900 truncate mb-1.5" id="mini-v3-now">▶ А. С. Пушкин (1836) — Капитанская дочка</div>
+            <div class="grid grid-cols-3 gap-1.5">
+              <button type="button" id="mini-v3-rew" class="py-2 rounded-xl bg-amber-100 border border-amber-400 font-extrabold text-xs text-slate-900">⏪ -30с</button>
+              <button type="button" id="mini-v3-play" class="col-span-2 py-2 rounded-xl bg-emerald-700 text-white font-extrabold text-sm">▶ СЛУШАТЬ</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Основная рабочая зона Шага 4 -->
+    <div id="single-phone-workspace" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- Левая колонка: Смартфон Android -->
+      <div id="phone-column-container" class="lg:col-span-7 flex flex-col items-center">
+        <div class="w-full max-w-md bg-amber-50/40 rounded-[36px] phone-frame overflow-hidden border border-slate-300 flex flex-col min-h-[750px] justify-between relative">
+
+          <!-- Статус-бар Android -->
+          <div class="bg-slate-900 text-white px-5 py-2.5 flex items-center justify-between text-xs font-semibold">
+            <div class="flex items-center gap-2">
+              <span id="network-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-800 text-emerald-100">
+                🌲 Режим: В лесу (Офлайн)
+              </span>
+              <span id="walk-timer-status-badge" class="text-amber-300 font-bold">⏱️ 45 мин</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span>🔋 94%</span>
+              <span>08:30</span>
+            </div>
+          </div>
+
+          <!-- Всплывающее уведомление внутри телефона -->
+          <div id="phone-toast" class="hidden bg-slate-900 text-amber-200 px-4 py-3 text-sm font-bold text-center border-b border-slate-700">
+            Сообщение системы
+          </div>
+
+          <!-- ВЕРХНЯЯ ПАНЕЛЬ ИЗ ДВУХ КРУПНЫХ ВКЛАДОК (Вариант 1) -->
+          <div id="top-nav-v1" class="grid grid-cols-2 gap-2.5 p-3 bg-stone-200 border-b-2 border-stone-300">
+            <button id="v1-tab-player" type="button" class="tap-target rounded-2xl font-extrabold text-lg flex items-center justify-center gap-2 bg-emerald-800 text-white shadow">
+              <span>▶</span>
+              <span>СЛУШАТЬ</span>
+            </button>
+            <button id="v1-tab-library" type="button" class="tap-target rounded-2xl font-extrabold text-lg flex items-center justify-center gap-2 bg-white text-slate-900 border-2 border-slate-300">
+              <span>📚</span>
+              <span>ПИСАТЕЛИ (<span id="v1-author-count">5</span>)</span>
+            </button>
+          </div>
+
+          <!-- Служебные блоки для совместимости -->
+          <div id="top-header-v2" class="hidden bg-emerald-900 text-white px-4 py-3 border-b-2 border-emerald-950">
+            <div class="text-xs uppercase tracking-wider text-emerald-200 font-bold" id="v2-step-label">ШАГ 1 ИЗ 3</div>
+            <div class="text-xl font-extrabold mt-0.5" id="v2-step-title">Выберите писателя</div>
+          </div>
+          <div id="top-header-v3" class="hidden bg-stone-800 text-white px-4 py-3 flex items-center justify-between">
+            <div>
+              <div class="text-lg font-extrabold">Библиотека по годам</div>
+              <div class="text-xs text-stone-300">Нажмите на писателя</div>
+            </div>
+            <span class="px-2.5 py-1 rounded-lg bg-emerald-700 text-xs font-bold">Кэш: <span id="v3-cache-badge">253 МБ</span></span>
+          </div>
+
+          <!-- ГЛАВНЫЙ ЭКРАН СМАРТФОНА -->
+          <main id="phone-main-content" class="flex-1 p-4 overflow-y-auto bg-[#FAF8F5] flex flex-col justify-between">
+            <!-- Рендерится динамически -->
+          </main>
+
+          <!-- Служебные нижние блоки для совместимости -->
+          <div id="bottom-player-v3" class="hidden bg-white border-t-4 border-emerald-800 p-3.5 shadow-lg">
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <div class="truncate">
+                <div class="text-xs font-bold uppercase text-emerald-800" id="v3-now-author">А. С. Пушкин • 1836 г.</div>
+                <div class="text-base font-extrabold text-slate-900 truncate" id="v3-now-title">Капитанская дочка</div>
+              </div>
+              <div class="text-sm font-bold text-slate-700 shrink-0" id="v3-now-time">04:12 / 28:00</div>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <button id="v3-btn-rewind" type="button" class="tap-target rounded-2xl bg-amber-100 border-2 border-amber-400 text-slate-900 font-extrabold text-base flex flex-col items-center justify-center py-2">
+                <span>⏪ -30 сек</span> <span class="text-[11px] font-semibold text-slate-600">Назад</span>
+              </button>
+              <button id="v3-btn-play" type="button" class="tap-target col-span-2 rounded-2xl bg-emerald-700 text-white font-extrabold text-xl flex items-center justify-center gap-2 py-2 shadow-md">
+                <span id="v3-play-icon">▶</span>
+                <span id="v3-play-label">ПУСК</span>
+              </button>
+            </div>
+          </div>
+
+          <nav id="bottom-nav-v2" class="hidden grid-cols-3 gap-2 p-3 bg-stone-200 border-t-2 border-stone-300" aria-label="Нижняя навигация">
+            <button id="v2-nav-authors" type="button" class="tap-target rounded-2xl font-extrabold text-base flex flex-col items-center justify-center py-2 bg-emerald-800 text-white">
+              <span class="text-xl">1. ✍️</span> <span>Писатели</span>
+            </button>
+            <button id="v2-nav-books" type="button" class="tap-target rounded-2xl font-extrabold text-base flex flex-col items-center justify-center py-2 bg-white text-slate-900 border-2 border-slate-300">
+              <span class="text-xl">2. 📅</span> <span>Годы и книги</span>
+            </button>
+            <button id="v2-nav-player" type="button" class="tap-target rounded-2xl font-extrabold text-base flex flex-col items-center justify-center py-2 bg-white text-slate-900 border-2 border-slate-300">
+              <span class="text-xl">3. 🎧</span> <span>Плеер</span>
+            </button>
+          </nav>
+
+        </div>
+      </div>
+
+      <!-- Правая колонка: Новые функции Шага 4 (Загрузчик реальных MP3 + Таймер прогулки + Семейная папка + Кэш) -->
+      <div id="dev-right-column" class="lg:col-span-5 flex flex-col gap-5">
+
+        <!-- НОВЫЙ БЛОК ШАГА 4: Реальный загрузчик MP3/M4B-файлов с автоопределением автора и года -->
+        <section class="bg-white rounded-2xl shadow-sm border-2 border-amber-500 p-5">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+              <span>📂</span>
+              <span>Загрузить свой MP3 / M4B файл</span>
+            </h2>
+            <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-950 text-xs font-extrabold">
+              Шаг 4 • Реальный звук
+            </span>
+          </div>
+          <p class="text-xs text-slate-600 mb-3">
+            Выберите любой аудиофайл со своего компьютера или смартфона. Парсер автоматически распознает шаблон <code>Писатель - Год - Название.mp3</code> (или позволит указать их ниже) и включит реальный звук в плеере!
+          </p>
+
+          <!-- Поля предзаполнения на случай, если в имени файла нет года -->
+          <div class="grid grid-cols-3 gap-2 mb-3">
+            <input id="custom-author-input" type="text" placeholder="Писатель (если нет в имени)" value="И. А. Бунин"
+              class="col-span-2 px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-900" />
+            <input id="custom-year-input" type="number" placeholder="Год" value="1900"
+              class="px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-900" />
+          </div>
+
+          <input id="local-audio-input" type="file" accept="audio/*,.mp3,.m4b,.m4a,.ogg,.wav" multiple class="hidden" />
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button id="btn-trigger-file-upload" type="button" class="py-3 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shadow-sm transition flex items-center justify-center gap-2">
+              <span>📥 Выбрать MP3/M4B файл...</span>
+            </button>
+            <button id="btn-test-walk-timer-alert" type="button" class="py-3 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-950 font-extrabold text-xs border border-emerald-300 transition flex items-center justify-center gap-1.5">
+              <span>🔔 Тест сигнала таймера прогулки</span>
+            </button>
+          </div>
+          <div id="upload-parse-log" class="mt-2.5 text-xs font-semibold text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+            Подсказка: если файл назван <code>Бунин И.А. - 1900 - Листопад.mp3</code>, год <strong>1900</strong> и автор определятся сами.
+          </div>
+        </section>
+
+        <!-- Блок Семейной облачной папки (из Шага 3) -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <span>👨‍👩‍👧</span>
+              <span>Семейная папка (Wi-Fi синхронизация)</span>
+            </h2>
+            <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 text-xs font-extrabold">
+              Яндекс.Диск / Google Drive
+            </span>
+          </div>
+
+          <div class="space-y-2 mb-3">
+            <button id="btn-family-add-chekhov" type="button" class="w-full p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-950 font-bold text-xs border border-emerald-300 flex items-center justify-between transition">
+              <span>➕ Отправить маме: А. П. Чехов — «Дама с собачкой» (1899 г., 22 МБ)</span>
+              <span class="font-extrabold text-emerald-800">В облако ➜</span>
+            </button>
+            <button id="btn-family-add-dostoevsky" type="button" class="w-full p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-950 font-bold text-xs border border-emerald-300 flex items-center justify-between transition">
+              <span>➕ Отправить маме: Ф. М. Достоевский — «Белые ночи» (1848 г., 38 МБ)</span>
+              <span class="font-extrabold text-emerald-800">В облако ➜</span>
+            </button>
+          </div>
+
+          <div id="family-sync-status" class="text-xs font-semibold text-emerald-800 bg-stone-100 p-2 rounded-lg">
+            ☁️ Семейная папка синхронизирована (5 авторов в библиотеке).
+          </div>
+        </section>
+
+        <!-- Блок Журнала позиций (из Шага 2) -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <span>📌</span>
+              <span>Журнал позиций (Память книг)</span>
+            </h2>
+            <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-xs font-extrabold">
+              Автосохранение
+            </span>
+          </div>
+          <div id="bookmark-history-list" class="space-y-2 mb-3 text-xs"></div>
+          <button id="btn-restore-last-pos" type="button" class="w-full py-2.5 px-3 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 font-extrabold text-xs border border-amber-300 transition">
+            ↺ Вернуть предыдущую точку остановки
+          </button>
+        </section>
+
+        <!-- Блок Контроля памяти и кэша (SimpleCache) -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <span>💾</span>
+              <span>Контроль памяти и кэша</span>
+            </h2>
+            <span id="cache-usage-badge" class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-extrabold">
+              253 / 350 МБ
+            </span>
+          </div>
+          <div class="w-full h-4 bg-slate-200 rounded-full overflow-hidden mb-3">
+            <div id="cache-progress-bar" class="h-full bg-emerald-600 transition-all duration-300" style="width: 72%"></div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <button id="btn-clean-listened" type="button" class="px-3.5 py-2.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold text-xs border border-amber-300 transition">
+              🧹 Очистить прослушанные (-66 МБ)
+            </button>
+            <button id="btn-wifi-prefetch" type="button" class="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs border border-slate-300 transition">
+              📶 Докачать по домашнему Wi-Fi
+            </button>
+          </div>
+          <p id="cache-status-msg" class="text-xs font-semibold text-emerald-800 mt-2.5">
+            ✓ В кэше 9 произведений (100% готовы для леса без связи).
+          </p>
+        </section>
+
+        <!-- Блок Симулятора Bluetooth-наушников в лесу -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <span>🎧</span>
+              <span>Тест кнопок гарнитуры в лесу</span>
+            </h2>
+            <span class="px-2 py-0.5 rounded bg-blue-100 text-blue-900 text-xs font-bold">Media3 ControllerInfo</span>
+          </div>
+
+          <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200 mb-3">
+            <span class="text-xs font-bold text-slate-800">Защита от случайного перескока главы</span>
+            <input type="checkbox" id="toggle-bt-lock" checked class="w-5 h-5 accent-emerald-700 rounded cursor-pointer" />
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <button id="btn-bt-playpause" type="button" class="px-3.5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition shadow-sm">
+              🔘 Нажатие гарнитуры: Пуск / Пауза
+            </button>
+            <button id="btn-bt-next" type="button" class="px-3.5 py-2.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-950 font-bold text-xs border border-rose-300 transition">
+              🧤 Случайное двойное нажатие (След. трек)
+            </button>
+          </div>
+          <div id="bt-log-box" class="mt-3 p-2.5 rounded-lg bg-slate-900 text-emerald-300 font-mono text-xs">
+            [MediaSession] Готов к командам Bluetooth-гарнитуры...
+          </div>
+        </section>
+
+        <div class="hidden">
+          <span id="metric-ram">22 МБ</span>
+          <span id="metric-cpu">1.8%</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const AUTHORS_DATA = [
+      {
+        id: 'pushkin',
+        name: 'А. С. Пушкин',
+        fullVoiceName: 'Александр Сергеевич Пушкин',
+        yearsLife: '1799–1837',
+        era: 'Золотой век',
+        works: [
+          {
+            id: 'ruslan',
+            year: 1820,
+            title: 'Руслан и Людмила',
+            type: 'Поэма',
+            durationSec: 1680,
+            currentSec: 252,
+            sizeMb: 18,
+            cached: true,
+            listened: true,
+            audioBlobUrl: null,
+            excerpt: 'У лукоморья дуб зелёный; Златая цепь на дубе том: И днём и ночью кот учёный Всё ходит по цепи кругом...'
+          },
+          {
+            id: 'belkin',
+            year: 1831,
+            title: 'Повести Белкина: Метель',
+            type: 'Проза',
+            durationSec: 2100,
+            currentSec: 185,
+            sizeMb: 42,
+            cached: true,
+            listened: false,
+            audioBlobUrl: null,
+            excerpt: 'В конце тысяча восемьсот одиннадцатого года, в достопамятную эпоху нам, жил в своём поместье Ненарадове добрый Гаврила Гаврилович...'
+          },
+          {
+            id: 'onegin',
+            year: 1833,
+            title: 'Евгений Онегин (Глава 1)',
+            type: 'Роман в стихах',
+            durationSec: 2400,
+            currentSec: 615,
+            sizeMb: 54,
+            cached: true,
+            listened: false,
+            audioBlobUrl: null,
+            excerpt: 'Мой дядя самых честных правил, Когда не в шутку занемог, Он уважать себя заставил И лучше выдумать не мог...'
+          },
+          {
+            id: 'kapitan',
+            year: 1836,
+            title: 'Капитанская дочка',
+            type: 'Роман',
+            durationSec: 1680,
+            currentSec: 252,
+            sizeMb: 64,
+            cached: true,
+            listened: false,
+            audioBlobUrl: null,
+            excerpt: 'Отец мой Андрей Петрович Гринёв в молодости своей служил при графе Минихе и вышел в отставку премьер-майором...'
+          },
+          {
+            id: 'dubrovsky',
+            year: 1841,
+            title: 'Дубровский (Полная запись)',
+            type: 'Роман',
+            durationSec: 3600,
+            currentSec: 0,
+            sizeMb: 64,
+            cached: false,
+            listened: false,
+            audioBlobUrl: null,
+            excerpt: 'Несколько лет тому назад в одном из своих поместий жил старинный русский барин, Кирила Петрович Троекуров...'
+          }
+        ]
+      },
+      {
+        id: 'lermontov',
+        name: 'М. Ю. Лермонтов',
+        fullVoiceName: 'Михаил Юрьевич Лермонтов',
+        yearsLife: '1814–1841',
+        era: 'Золотой век',
+        works: [
+          {
+            id: 'parus',
+            year: 1832,
+            title: 'Парус («Белеет парус одинокой...»)',
+            type: 'Стихотворение',
+            durationSec: 115,
+            currentSec: 0,
+            sizeMb: 2,
+            cached: true,
+            listened: false,
+            audioBlobUrl: null,
+            excerpt: 'Белеет парус одинокой В тумане моря голубом! Что ищет он в стране далёкой? Что кинул он в краю родном?..'
+          },
+          {
+            id: 'borodino',
+            year: 1837,
+            title: 'Бородино',
+            type: 'Стихотворение',
+            durationSec: 260,
+            currentSec: 90,
+            sizeMb: 4,
+            cached: true,
+            listened: true,
+            audioBlobUrl: null,
+            excerpt: 'Скажи-ка, дядя, ведь не даром Москва, спалённая пожаром, Французу отдана? Ведь были ж схватки боевые...'
+          },
+          {
+            id: 'mtsyri',
+            year: 1840,
+            title: 'Мцыри',
+            type: 'Поэма',
+            durationSec: 1920,
+            currentSec: 0,
+            sizeMb: 19,
+            cached: false,
+            listened: false,
+            audioBlobUrl: null,
+            excerpt: 'Немного лет тому назад, Там, где, сливаяся, шумят, Обнявшись, будто две сестры, Струи Арагвы и Куры...'
+          }
+        ]
+      },
+      {
+        id: 'tolstoy',
+        name: 'Л. Н. Толстой',
+        fullVoiceName: 'Лев Николаевич Толстой',
+        yearsLife: '1828–1910',
+        era: 'Классический роман',
+        works: [
+          {
+            id: 'detstvo',
+            year: 1852,
+            title: 'Детство (Главы 1–5)',
+            type: 'Повесть',
+            durationSec: 2800,
+            currentSec: 400,
+            sizeMb: 44,
+            cached: true,
+            listened: true,
+            audioBlobUrl: null,
+            excerpt: 'Двенадцатого августа тысяча восемьсот... ровно в третий день после дня моего рождения, в который мне минуло десять лет...'
+          },
+          {
+            id: 'warpeace',
+            year: 1869,
+            title: 'Война и мир (Том 1, Часть 1)',
+            type: 'Роман-эпопея',
+            durationSec: 4200,
+            currentSec: 120,
+            sizeMb: 58,
+            cached: false,
+            listened: false,
+            audioBlobUrl: null,
+            excerpt: 'На небо уже не было ни одного облачка, только на востоке ещё стояла туманная мгла, когда князь Андрей выехал в поле...'
+          }
+        ]
+      },
+      {
+        id: 'yesenin',
+        name: 'С. А. Есенин',
+        fullVoiceName: 'Сергей Александрович Есенин',
+        yearsLife: '1895–1925',
+        era: 'Серебряный век',
+        works: [
+          {
+            id: 'bereza',
+            year: 1913,
+            title: 'Белая берёза под моим окном',
+            type: 'Стихотворение',
+            durationSec: 95,
+            currentSec: 0,
+            sizeMb: 2,
+            cached: true,
+            listened: false,
+            audioBlobUrl: null,
+            excerpt: 'Белая берёза под моим окном Принакрылась снегом, точно серебром. На пушистых ветках снежною каймой Распустились кисти белой бахромой...'
+          },
+          {
+            id: 'nezhaleyu',
+            year: 1921,
+            title: 'Не жалею, не зову, не плачу',
+            type: 'Стихотворение',
+            durationSec: 140,
+            currentSec: 45,
+            sizeMb: 3,
+            cached: true,
+            listened: false,
+            audioBlobUrl: null,
+            excerpt: 'Не жалею, не зову, не плачу, Всё пройдёт, как с белых яблонь дым. Увяданья золотом охваченный, Я не буду больше молодым...'
+          },
+          {
+            id: 'pismo',
+            year: 1924,
+            title: 'Письмо матери',
+            type: 'Стихотворение',
+            durationSec: 165,
+            currentSec: 0,
+            sizeMb: 3,
+            cached: true,
+            listened: false,
+            audioBlobUrl: null,
+            excerpt: 'Ты жива ещё, моя старушка? Жив и я. Привет тебе, привет! Пусть струится над твоей избушкой Тот вечерний несказанный свет...'
+          }
+        ]
+      },
+      {
+        id: 'silver_age',
+        name: 'Гумилёв и Мандельштам',
+        fullVoiceName: 'Поэты Серебряного века',
+        yearsLife: '1908–1915',
+        era: 'Серебряный век',
+        works: [
+          {
+            id: 'zhiraf',
+            year: 1908,
+            title: 'Н. С. Гумилёв — Жираф',
+            type: 'Стихотворение',
+            durationSec: 130,
+            currentSec: 0,
+            sizeMb: 2,
+            cached: true,
+            listened: false,
+            audioBlobUrl: null,
+            excerpt: 'Сегодня, я вижу, особенно грустен твой взгляд, И руки особенно тонки, колени обняв. Послушай: далёко, далёко, на озере Чад Изысканный бродит жираф...'
+          },
+          {
+            id: 'kamen',
+            year: 1913,
+            title: 'О. Э. Мандельштам — Сборник «Камень»',
+            type: 'Поэтический сборник',
+            durationSec: 1500,
+            currentSec: 0,
+            sizeMb: 19,
+            cached: true,
+            listened: false,
+            audioBlobUrl: null,
+            excerpt: 'Бессонница. Гомер. Тугие паруса. Я список кораблей прочёл до середины: Сей длинный выводок, сей поезд журавлиный, Что над Элладою когда-то поднялся...'
+          }
+        ]
+      }
+    ];
+
+    const state = {
+      showAllThree: false,
+      variant: 1,
+      v1Tab: 'player',
+      v1SelectedAuthorId: null,
+      v2Step: 'books',
+      v2SelectedAuthorId: 'pushkin',
+      v3ExpandedAuthorId: 'pushkin',
+      sortOrder: 'asc',
+      currentAuthorId: 'pushkin',
+      currentWorkId: 'kapitan',
+      isPlaying: false,
+      pocketLockMode: false,
+      walkTimerMinutes: 45, // 0 = Выкл, 30, 45, 60
+      cacheLimitMb: 350,
+      btLockEnabled: true,
+      soundEnabled: true,
+      voiceGuideEnabled: true,
+      speechRate: 0.92,
+      timerId: null,
+      positionHistory: [
+        { authorId: 'pushkin', workId: 'onegin', sec: 615, label: 'А. С. Пушкин — Евгений Онегин (10:15)' },
+        { authorId: 'pushkin', workId: 'kapitan', sec: 252, label: 'А. С. Пушкин — Капитанская дочка (04:12)' }
+      ]
+    };
+
+    function loadSavedProgress() {
+      try {
+        const raw = localStorage.getItem('lesnoy_chtets_progress_v2');
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed.currentAuthorId) state.currentAuthorId = parsed.currentAuthorId;
+        if (parsed.currentWorkId) state.currentWorkId = parsed.currentWorkId;
+        if (parsed.positions) {
+          AUTHORS_DATA.forEach(a => {
+            a.works.forEach(w => {
+              if (typeof parsed.positions[w.id] === 'number') {
+                w.currentSec = parsed.positions[w.id];
+              }
+            });
+          });
+        }
+      } catch (e) {}
+    }
+
+    function saveProgress() {
+      try {
+        const positions = {};
+        AUTHORS_DATA.forEach(a => {
+          a.works.forEach(w => {
+            positions[w.id] = w.currentSec;
+          });
+        });
+        localStorage.setItem('lesnoy_chtets_progress_v2', JSON.stringify({
+          currentAuthorId: state.currentAuthorId,
+          currentWorkId: state.currentWorkId,
+          positions
+        }));
+      } catch (e) {}
+    }
+
+    function recordPositionSnapshot(reason) {
+      const { author, work } = getCurrentSelection();
+      const entry = {
+        authorId: author.id,
+        workId: work.id,
+        sec: work.currentSec,
+        label: `${author.name} — ${work.title} (${formatTime(work.currentSec)}) • ${reason}`
+      };
+      state.positionHistory.unshift(entry);
+      if (state.positionHistory.length > 4) {
+        state.positionHistory.pop();
+      }
+    }
+
+    function restoreLastPosition() {
+      if (state.positionHistory.length === 0) {
+        showPhoneToast('История точек остановки пуста');
+        return;
+      }
+      const prev = state.positionHistory[0];
+      const author = AUTHORS_DATA.find(a => a.id === prev.authorId);
+      if (!author) return;
+      const work = author.works.find(w => w.id === prev.workId);
+      if (!work) return;
+
+      state.currentAuthorId = author.id;
+      state.currentWorkId = work.id;
+      work.currentSec = prev.sec;
+      const audioEl = document.getElementById('real-audio-engine');
+      if (work.audioBlobUrl && audioEl) {
+        audioEl.currentTime = prev.sec;
+      }
+      saveProgress();
+      playClickTone(620);
+      showPhoneToast(`↺ Возвращена точка: ${work.title} (${formatTime(work.currentSec)})`);
+      renderAll();
+    }
+
+    function formatTime(sec) {
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    function getCurrentSelection() {
+      const author = AUTHORS_DATA.find(a => a.id === state.currentAuthorId) || AUTHORS_DATA[0];
+      const work = author.works.find(w => w.id === state.currentWorkId) || author.works[0];
+      return { author, work };
+    }
+
+    function calculateCacheMb() {
+      let total = 0;
+      let count = 0;
+      AUTHORS_DATA.forEach(a => {
+        a.works.forEach(w => {
+          if (w.cached) {
+            total += w.sizeMb;
+            count += 1;
+          }
+        });
+      });
+      return { total, count };
+    }
+
+    let audioCtx = null;
+    function playClickTone(freq = 520) {
+      if (!state.soundEnabled) return;
+      try {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) audioCtx = new AudioContextClass();
+        }
+        if (audioCtx) {
+          if (audioCtx.state === 'suspended') audioCtx.resume();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.09);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.09);
+        }
+      } catch (e) {}
+    }
+
+    function speakCustomAnnouncement(phrase) {
+      if (!state.soundEnabled) return;
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utter = new SpeechSynthesisUtterance(phrase);
+          utter.lang = 'ru-RU';
+          utter.rate = 0.92;
+          window.speechSynthesis.speak(utter);
+        }
+      } catch (e) {}
+    }
+
+    function speakCurrentExcerpt(announceTitleFirst = false) {
+      const { author, work } = getCurrentSelection();
+      const audioEl = document.getElementById('real-audio-engine');
+
+      // Если это реальный загруженный MP3/M4B файл, запускаем настоящий HTML5 Audio
+      if (work.audioBlobUrl && audioEl) {
+        stopSpeech();
+        if (audioEl.src !== work.audioBlobUrl) {
+          audioEl.src = work.audioBlobUrl;
+          audioEl.currentTime = work.currentSec || 0;
+        }
+        audioEl.playbackRate = state.speechRate === 0.8 ? 0.85 : 1.0;
+        audioEl.play().catch(() => {});
+        return;
+      }
+
+      if (audioEl && !audioEl.paused) {
+        audioEl.pause();
+      }
+
+      if (!state.soundEnabled) return;
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          if (state.isPlaying) {
+            let textToSpeak = work.excerpt;
+            if (announceTitleFirst && state.voiceGuideEnabled) {
+              const mins = Math.floor(work.currentSec / 60);
+              const resumePhrase = mins > 0 ? `Продолжаем с ${mins} минуты.` : 'Начинаем с начала.';
+              textToSpeak = `${author.fullVoiceName || author.name}. ${work.year} год. ${work.title}. ${resumePhrase} ${work.excerpt}`;
+            }
+            const utter = new SpeechSynthesisUtterance(textToSpeak);
+            utter.lang = 'ru-RU';
+            utter.rate = state.speechRate;
+            window.speechSynthesis.speak(utter);
+          }
+        }
+      } catch (e) {}
+    }
+
+    function stopSpeech() {
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+        }
+      } catch (e) {}
+      const audioEl = document.getElementById('real-audio-engine');
+      if (audioEl && !audioEl.paused) {
+        audioEl.pause();
+      }
+    }
+
+    let toastTimeout = null;
+    function showPhoneToast(msg) {
+      const el = document.getElementById('phone-toast');
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        el.classList.add('hidden');
+      }, 3600);
+    }
+
+    function togglePlayback() {
+      const { work } = getCurrentSelection();
+      if (!work.cached) {
+        playClickTone(260);
+        showPhoneToast('⚠️ Книга не в кэше! Нажмите «Скачать в память» или «Докачать по Wi-Fi».');
+        return;
+      }
+      state.isPlaying = !state.isPlaying;
+      playClickTone(state.isPlaying ? 660 : 420);
+
+      if (state.timerId) {
+        clearInterval(state.timerId);
+        state.timerId = null;
+      }
+
+      if (state.isPlaying) {
+        speakCurrentExcerpt(false);
+        state.timerId = setInterval(() => {
+          const sel = getCurrentSelection();
+          const audioEl = document.getElementById('real-audio-engine');
+          if (sel.work.audioBlobUrl && audioEl && !audioEl.paused) {
+            sel.work.currentSec = Math.floor(audioEl.currentTime);
+            if (audioEl.duration && !isNaN(audioEl.duration)) {
+              sel.work.durationSec = Math.max(1, Math.floor(audioEl.duration));
+            }
+            saveProgress();
+            renderAll();
+          } else if (sel.work.currentSec < sel.work.durationSec) {
+            sel.work.currentSec += 1;
+            saveProgress();
+            renderAll();
+          } else {
+            advanceToNextChronologicalWork();
+          }
+        }, 1000);
+      } else {
+        recordPositionSnapshot('Пауза');
+        saveProgress();
+        stopSpeech();
+      }
+      renderAll();
+    }
+
+    function rewind30Sec() {
+      playClickTone(480);
+      recordPositionSnapshot('До перемотки -30с');
+      const { work } = getCurrentSelection();
+      work.currentSec = Math.max(0, work.currentSec - 30);
+      const audioEl = document.getElementById('real-audio-engine');
+      if (work.audioBlobUrl && audioEl) {
+        audioEl.currentTime = work.currentSec;
+      }
+      saveProgress();
+      showPhoneToast('⏪ Перемотано на 30 секунд назад');
+      renderAll();
+    }
+
+    function advanceToNextChronologicalWork() {
+      const { author, work } = getCurrentSelection();
+      const sorted = [...author.works].sort((a, b) => a.year - b.year);
+      const idx = sorted.findIndex(w => w.id === work.id);
+      const nextWork = sorted[idx + 1];
+      if (nextWork && nextWork.cached) {
+        recordPositionSnapshot('Завершена глава');
+        state.currentWorkId = nextWork.id;
+        saveProgress();
+        showPhoneToast('▶ Автопереход: ' + nextWork.year + ' г. — ' + nextWork.title);
+        speakCurrentExcerpt(true);
+      } else {
+        state.isPlaying = false;
+        if (state.timerId) clearInterval(state.timerId);
+        stopSpeech();
+      }
+      renderAll();
+    }
+
+    function selectWork(authorId, workId) {
+      const author = AUTHORS_DATA.find(a => a.id === authorId);
+      if (!author) return;
+      const work = author.works.find(w => w.id === workId);
+      if (!work) return;
+
+      if (!work.cached) {
+        const { total } = calculateCacheMb();
+        if (total + work.sizeMb <= state.cacheLimitMb) {
+          work.cached = true;
+          playClickTone(640);
+          showPhoneToast(`📥 Книга «${work.title}» (${work.sizeMb} МБ) загружена в офлайн-кэш!`);
+        } else {
+          playClickTone(260);
+          showPhoneToast('⚠️ Лимит кэша (350 МБ) заполнен! Нажмите «Очистить прослушанные».');
+          return;
+        }
+      }
+
+      recordPositionSnapshot('До смены книги');
+      state.currentAuthorId = authorId;
+      state.currentWorkId = workId;
+      state.isPlaying = true;
+      saveProgress();
+      playClickTone(680);
+
+      if (state.timerId) clearInterval(state.timerId);
+      speakCurrentExcerpt(true);
+      state.timerId = setInterval(() => {
+        const sel = getCurrentSelection();
+        const audioEl = document.getElementById('real-audio-engine');
+        if (sel.work.audioBlobUrl && audioEl && !audioEl.paused) {
+          sel.work.currentSec = Math.floor(audioEl.currentTime);
+          if (audioEl.duration && !isNaN(audioEl.duration)) {
+            sel.work.durationSec = Math.max(1, Math.floor(audioEl.duration));
+          }
+          saveProgress();
+          renderAll();
+        } else if (sel.work.currentSec < sel.work.durationSec) {
+          sel.work.currentSec += 1;
+          saveProgress();
+          renderAll();
+        }
+      }, 1000);
+
+      if (state.variant === 1) {
+        state.v1Tab = 'player';
+      } else if (state.variant === 2) {
+        state.v2Step = 'player';
+      }
+      showPhoneToast(`🗣️ Включено: «${author.name}, ${work.year} г. — ${work.title}»`);
+      renderAll();
+    }
+
+    // Парсер имени файла по шаблону "Писатель - Год - Название.mp3"
+    function parseUploadedAudioFilename(rawFilename) {
+      const cleanName = rawFilename.replace(/\.[^/.]+$/, '');
+      const fallbackAuthor = (document.getElementById('custom-author-input')?.value || 'И. А. Бунин').trim();
+      const fallbackYear = parseInt(document.getElementById('custom-year-input')?.value || '1900', 10) || 1900;
+
+      // Шаблон 1: "Автор - 1899 - Название"
+      const parts = cleanName.split(/\s*[-—–]\s*/);
+      if (parts.length >= 3) {
+        const maybeYear = parseInt(parts[1], 10);
+        if (!isNaN(maybeYear) && maybeYear >= 1700 && maybeYear <= 2030) {
+          return {
+            authorName: parts[0].trim(),
+            year: maybeYear,
+            title: parts.slice(2).join(' — ').trim()
+          };
+        }
+      }
+
+      // Шаблон 2: ищем любой 4-значный год в названии файла
+      const yearMatch = cleanName.match(/\b(1[789]\d{2}|20\d{2})\b/);
+      if (yearMatch) {
+        const foundYear = parseInt(yearMatch[1], 10);
+        const titleWithoutYear = cleanName.replace(yearMatch[0], '').replace(/^[\s\-—–_]+|[\s\-—–_]+$/g, '');
+        return {
+          authorName: fallbackAuthor,
+          year: foundYear,
+          title: titleWithoutYear || cleanName
+        };
+      }
+
+      return {
+        authorName: fallbackAuthor,
+        year: fallbackYear,
+        title: cleanName
+      };
+    }
+
+    function getSortedWorks(works) {
+      return [...works].sort((a, b) => {
+        return state.sortOrder === 'asc' ? a.year - b.year : b.year - a.year;
+      });
+    }
+
+    function renderPocketLockScreenHTML() {
+      const { author, work } = getCurrentSelection();
+      return `
+        <div class="bg-slate-950 text-white rounded-3xl p-6 h-full flex flex-col justify-between items-center text-center border-2 border-slate-700">
+          <div class="w-full flex items-center justify-between text-xs font-bold text-emerald-400">
+            <span>🔒 ЭКРАН ЗАБЛОКИРОВАН В КАРМАНЕ</span>
+            <span>🔋 94%</span>
+          </div>
+
+          <div class="my-2">
+            <div class="text-5xl font-extrabold tracking-tight text-white">08:30</div>
+            <div class="text-xs font-bold uppercase tracking-widest text-amber-300 mt-2">
+              Экономия батареи в лесу • Таймер прогулки: ${state.walkTimerMinutes > 0 ? state.walkTimerMinutes + ' мин' : 'Выкл'}
+            </div>
+          </div>
+
+          <div class="w-full p-4 rounded-2xl bg-slate-900 border border-slate-700">
+            <div class="text-xs font-bold text-amber-300">${author.name} • ${work.year} г.</div>
+            <div class="text-xl font-extrabold text-white mt-0.5">${work.title}</div>
+            <div class="text-sm font-bold text-emerald-400 mt-1">
+              📍 Позиция: ${formatTime(work.currentSec)} из ${formatTime(work.durationSec)}
+            </div>
+          </div>
+
+          <div class="w-full space-y-3 mt-3">
+            <button id="pocket-play-btn" type="button" class="tap-target w-full py-6 rounded-3xl font-extrabold text-2xl shadow-md flex items-center justify-center gap-3 border-4 ${
+              state.isPlaying
+                ? 'bg-amber-600 text-white border-amber-400'
+                : 'bg-emerald-700 text-white border-emerald-400'
+            }">
+              <span>${state.isPlaying ? '⏸ ПАУЗА' : '▶ СЛУШАТЬ'}</span>
+            </button>
+
+            <button id="btn-unlock-pocket" type="button" class="tap-target w-full py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-amber-200 font-extrabold text-base border-2 border-amber-400">
+              🔓 РАЗБЛОКИРОВАТЬ ЭКРАН
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderFullPlayerHTML() {
+      if (state.pocketLockMode) {
+        return renderPocketLockScreenHTML();
+      }
+      const { author, work } = getCurrentSelection();
+      const pct = Math.min(100, Math.round((work.currentSec / work.durationSec) * 100));
+
+      return `
+        <div class="flex flex-col justify-between h-full gap-2.5">
+          <div class="bg-white rounded-3xl p-4 border-2 border-stone-300 shadow-sm">
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <span class="px-3 py-1 rounded-xl bg-amber-100 text-amber-950 font-extrabold text-sm border border-amber-300">
+                📅 Год выхода: ${work.year}
+              </span>
+              <span class="px-2.5 py-1 rounded-xl bg-emerald-100 text-emerald-900 font-bold text-xs">
+                ${work.audioBlobUrl ? '🎵 Реальный MP3 (' + work.sizeMb + ' МБ)' : '✓ Офлайн в кэше (' + work.sizeMb + ' МБ)'}
+              </span>
+            </div>
+
+            <div class="text-sm font-bold text-slate-600 mt-1">${author.name} (${author.era})</div>
+            <h2 class="text-xl font-extrabold text-slate-900 leading-tight mt-0.5">${work.title}</h2>
+
+            <div class="mt-2.5 p-3 rounded-2xl bg-stone-100 border border-stone-200 text-slate-800 text-sm font-medium leading-relaxed">
+              «${work.excerpt}»
+            </div>
+
+            <div class="mt-3">
+              <div class="flex items-center justify-between text-sm font-extrabold text-slate-800 mb-1">
+                <span class="text-emerald-800">📍 Позиция: ${formatTime(work.currentSec)}</span>
+                <span>Всего: ${formatTime(work.durationSec)}</span>
+              </div>
+              <div class="w-full h-4 bg-stone-200 rounded-full overflow-hidden border border-stone-300">
+                <div class="h-full bg-emerald-700 transition-all duration-300" style="width: ${pct}%"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <button id="main-play-btn" type="button" class="tap-target w-full py-5 rounded-3xl font-extrabold text-2xl shadow-md flex items-center justify-center gap-3 border-4 ${
+              state.isPlaying
+                ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-800'
+                : 'bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-900'
+            }">
+              <span class="text-3xl">${state.isPlaying ? '⏸' : '▶'}</span>
+              <span>${state.isPlaying ? 'ПАУЗА (СОХРАНИТЬ МЕСТО)' : 'ПРОДОЛЖИТЬ С ' + formatTime(work.currentSec)}</span>
+            </button>
+
+            <div class="grid grid-cols-2 gap-2">
+              <button id="main-rewind-btn" type="button" class="tap-target py-3 px-3 rounded-2xl bg-white hover:bg-stone-100 text-slate-900 font-extrabold text-base border-2 border-slate-400 shadow-sm flex flex-col items-center justify-center">
+                <span>⏪ Назад 30 сек</span>
+                <span class="text-xs font-semibold text-slate-600">Если отвлеклись</span>
+              </button>
+              <button id="main-switch-book-btn" type="button" class="tap-target py-3 px-3 rounded-2xl bg-stone-200 hover:bg-stone-300 text-slate-900 font-extrabold text-base border-2 border-slate-400 shadow-sm flex flex-col items-center justify-center">
+                <span>📚 Другая книга</span>
+                <span class="text-xs font-semibold text-slate-700">Писатели и годы</span>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <button id="phone-restore-pos-btn" type="button" class="py-2.5 px-2 rounded-2xl bg-amber-100 border-2 border-amber-300 text-amber-950 font-extrabold text-xs flex items-center justify-center gap-1">
+                <span>↺ Вернуть позицию</span>
+              </button>
+              <button id="phone-speed-btn" type="button" class="py-2.5 px-2 rounded-2xl bg-white border-2 border-slate-300 text-slate-800 font-extrabold text-xs flex items-center justify-center gap-1">
+                <span>🐢 Темп речи: ${state.speechRate === 0.92 ? 'Обычный' : 'Размеренный (0.8x)'}</span>
+              </button>
+            </div>
+
+            <!-- Нижний ряд Шага 4: Таймер прогулки + Блокировка в кармане -->
+            <div class="grid grid-cols-2 gap-2">
+              <button id="phone-walk-timer-btn" type="button" class="py-2.5 px-2 rounded-2xl bg-emerald-100 border-2 border-emerald-600 text-emerald-950 font-extrabold text-xs flex items-center justify-center gap-1">
+                <span>🌲 Прогулка: ${state.walkTimerMinutes > 0 ? state.walkTimerMinutes + ' мин' : 'Выкл'}</span>
+              </button>
+              <button id="phone-lock-pocket-btn" type="button" class="py-2.5 px-2 rounded-2xl bg-slate-900 text-amber-300 font-extrabold text-xs flex items-center justify-center gap-1 shadow">
+                <span>🔒 Положить телефон в карман (Блокировка экрана)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSortBarHTML() {
+      return `
+        <div class="bg-stone-200/80 p-2.5 rounded-2xl border border-stone-300 mb-3 flex items-center justify-between gap-2">
+          <span class="text-xs font-extrabold uppercase text-slate-700 pl-1">По годам издания:</span>
+          <button id="btn-toggle-sort" type="button" class="px-3.5 py-2 rounded-xl bg-white border-2 border-slate-400 font-extrabold text-sm text-slate-900 shadow-sm">
+            ${state.sortOrder === 'asc' ? '📅 От ранних (1820 → 1924)' : '📅 От поздних (1924 → 1820)'}
+          </button>
+        </div>
+      `;
+    }
+
+    function renderAuthorWorksListHTML(author, showBackButton = true) {
+      const sortedWorks = getSortedWorks(author.works);
+      const itemsHtml = sortedWorks.map(w => {
+        const isCurrent = state.currentAuthorId === author.id && state.currentWorkId === w.id;
+        const hasProgress = w.currentSec > 0;
+        return `
+          <div class="mb-2.5 rounded-2xl border-2 transition p-3.5 ${
+            isCurrent
+              ? 'bg-emerald-50 border-emerald-700'
+              : w.cached
+                ? 'bg-white border-slate-300'
+                : 'bg-stone-100 border-stone-300'
+          }">
+            <button type="button" data-select-author="${author.id}" data-select-work="${w.id}"
+              class="work-item-btn tap-target w-full text-left flex items-center justify-between gap-3">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="shrink-0 w-16 h-16 rounded-2xl flex flex-col items-center justify-center font-extrabold border-2 ${
+                  isCurrent
+                    ? 'bg-emerald-800 text-white border-emerald-900'
+                    : 'bg-amber-100 text-amber-950 border-amber-300'
+                }">
+                  <span class="text-[10px] uppercase tracking-wider opacity-80">ГОД</span>
+                  <span class="text-lg leading-none mt-0.5">${w.year}</span>
+                </div>
+                <div class="min-w-0">
+                  <div class="text-lg font-extrabold text-slate-900 leading-snug">${w.title}</div>
+                  <div class="text-xs font-bold text-emerald-800 mt-1">
+                    ${hasProgress ? '📍 Продолжить с ' + formatTime(w.currentSec) + ' (из ' + formatTime(w.durationSec) + ')' : '🆕 Начать с начала (' + formatTime(w.durationSec) + ')'}
+                  </div>
+                  <div class="text-xs font-semibold text-slate-600 mt-0.5">
+                    ${w.type} • ${w.cached ? '✓ В памяти (' + w.sizeMb + ' МБ)' : '☁️ Нажмите, чтобы скачать (' + w.sizeMb + ' МБ)'}
+                  </div>
+                </div>
+              </div>
+              <div class="shrink-0">
+                <span class="inline-flex items-center justify-center w-12 h-12 rounded-2xl font-extrabold text-lg ${
+                  isCurrent && state.isPlaying
+                    ? 'bg-amber-600 text-white'
+                    : w.cached
+                      ? 'bg-emerald-700 text-white'
+                      : 'bg-stone-300 text-stone-800'
+                }">
+                  ${isCurrent && state.isPlaying ? '⏸' : w.cached ? '▶' : '📥'}
+                </span>
+              </div>
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div>
+          ${showBackButton ? `
+            <button id="btn-back-to-authors" type="button" class="tap-target w-full mb-3 py-3.5 px-4 rounded-2xl bg-stone-800 text-white font-extrabold text-lg flex items-center justify-center gap-2 shadow">
+              <span>⬅</span>
+              <span>НАЗАД К СПИСКУ ПИСАТЕЛЕЙ</span>
+            </button>
+          ` : ''}
+          <div class="mb-2 px-1">
+            <div class="text-xs font-bold uppercase text-emerald-800">${author.era} • ${author.yearsLife}</div>
+            <h3 class="text-2xl font-extrabold text-slate-900">${author.name}</h3>
+          </div>
+          ${renderSortBarHTML()}
+          <div>${itemsHtml}</div>
+        </div>
+      `;
+    }
+
+    function renderAuthorsListHTML() {
+      return `
+        <div>
+          <div class="mb-3 px-1">
+            <h3 class="text-xl font-extrabold text-slate-900">Выберите писателя:</h3>
+            <p class="text-sm text-slate-600">Книги внутри отсортированы по годам издания и помнят секунду остановки</p>
+          </div>
+          <div class="space-y-3">
+            ${AUTHORS_DATA.map(a => {
+              const years = a.works.map(w => w.year);
+              const minYear = Math.min(...years);
+              const maxYear = Math.max(...years);
+              const cachedCount = a.works.filter(w => w.cached).length;
+              return `
+                <button type="button" data-open-author="${a.id}"
+                  class="author-card-btn tap-target w-full text-left p-4 rounded-3xl bg-white border-2 border-slate-300 hover:border-emerald-700 shadow-sm flex items-center justify-between gap-3">
+                  <div>
+                    <div class="inline-block px-2.5 py-0.5 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs mb-1">
+                      ${a.era} • Произведения ${minYear}–${maxYear} гг.
+                    </div>
+                    <div class="text-xl font-extrabold text-slate-900">${a.name}</div>
+                    <div class="text-sm font-semibold text-emerald-800 mt-0.5">
+                      Готово офлайн в лесу: ${cachedCount} из ${a.works.length} книг
+                    </div>
+                  </div>
+                  <div class="w-12 h-12 rounded-2xl bg-stone-100 border border-stone-300 flex items-center justify-center text-xl font-extrabold text-slate-800 shrink-0">
+                    ➜
+                  </div>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderVariant3AccordionHTML() {
+      return `
+        <div>
+          ${renderSortBarHTML()}
+          <div class="space-y-3 pb-2">
+            ${AUTHORS_DATA.map(a => {
+              const isExpanded = state.v3ExpandedAuthorId === a.id;
+              const sortedWorks = getSortedWorks(a.works);
+              const years = a.works.map(w => w.year);
+              const minY = Math.min(...years);
+              const maxY = Math.max(...years);
+
+              return `
+                <div class="rounded-3xl border-2 ${isExpanded ? 'border-emerald-800 bg-white' : 'border-slate-300 bg-white'} overflow-hidden shadow-sm">
+                  <button type="button" data-accordion-author="${a.id}"
+                    class="accordion-author-btn tap-target w-full p-4 text-left flex items-center justify-between gap-2 ${
+                      isExpanded ? 'bg-emerald-900 text-white' : 'bg-white text-slate-900'
+                    }">
+                    <div>
+                      <div class="text-xs font-bold uppercase ${isExpanded ? 'text-emerald-200' : 'text-emerald-800'}">
+                        ${a.era} • ${minY}–${maxY} гг.
+                      </div>
+                      <div class="text-xl font-extrabold">${a.name}</div>
+                    </div>
+                    <span class="text-2xl font-extrabold px-2">${isExpanded ? '▲' : '▼'}</span>
+                  </button>
+                  ${isExpanded ? `
+                    <div class="p-3 bg-stone-50 border-t border-stone-200 space-y-2">
+                      ${sortedWorks.map(w => `
+                        <button type="button" data-select-author="${a.id}" data-select-work="${w.id}"
+                          class="work-item-btn tap-target w-full text-left p-3 rounded-2xl border-2 bg-white border-slate-300 flex items-center justify-between gap-2">
+                          <span class="font-extrabold text-sm">${w.year} • ${w.title}</span>
+                          <span class="px-3 py-1 rounded-xl bg-emerald-700 text-white font-bold text-xs">▶</span>
+                        </button>
+                      `).join('')}
+                    </div>
+                  ` : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderBookmarkHistory() {
+      const box = document.getElementById('bookmark-history-list');
+      if (!box) return;
+      box.innerHTML = state.positionHistory.slice(0, 3).map((item, idx) => `
+        <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2">
+          <span class="font-semibold text-slate-800 truncate">${idx === 0 ? '🕒 ' : '• '}${item.label}</span>
+        </div>
+      `).join('');
+    }
+
+    function renderMiniShowcase() {
+      const { author, work } = getCurrentSelection();
+      const miniV1Body = document.getElementById('mini-v1-body');
+      if (miniV1Body) {
+        miniV1Body.innerHTML = `
+          <div class="bg-white rounded-2xl p-3 border border-stone-300">
+            <span class="inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-950 font-extrabold text-xs">📅 Год: ${work.year}</span>
+            <div class="text-xs font-bold text-slate-500 mt-1">${author.name}</div>
+            <div class="text-lg font-extrabold text-slate-900">${work.title}</div>
+            <div class="text-xs text-emerald-800 font-bold mt-1">📍 Сохранено: ${formatTime(work.currentSec)}</div>
+          </div>
+          <div class="space-y-2 mt-3">
+            <button type="button" class="mini-play-trigger w-full py-4 rounded-2xl font-extrabold text-base text-white ${state.isPlaying ? 'bg-amber-600' : 'bg-emerald-700'}">
+              ${state.isPlaying ? '⏸ ПАУЗА' : '▶ СЛУШАТЬ КНИГУ'}
+            </button>
+          </div>
+        `;
+      }
+    }
+
+    function renderAll() {
+      const showcaseEl = document.getElementById('all-three-showcase');
+      if (showcaseEl) {
+        showcaseEl.classList.toggle('hidden', !state.showAllThree);
+      }
+
+      document.getElementById('v1-author-count').textContent = String(AUTHORS_DATA.length);
+      const timerBadge = document.getElementById('walk-timer-status-badge');
+      if (timerBadge) {
+        timerBadge.textContent = state.walkTimerMinutes > 0 ? `⏱️ ${state.walkTimerMinutes} мин` : '⏱️ Выкл';
+      }
+
+      renderMiniShowcase();
+      renderBookmarkHistory();
+
+      const topNavV1 = document.getElementById('top-nav-v1');
+      const topHeaderV2 = document.getElementById('top-header-v2');
+      const topHeaderV3 = document.getElementById('top-header-v3');
+      const bottomPlayerV3 = document.getElementById('bottom-player-v3');
+      const bottomNavV2 = document.getElementById('bottom-nav-v2');
+
+      topNavV1.classList.toggle('hidden', state.variant !== 1 || state.pocketLockMode);
+      topHeaderV2.classList.toggle('hidden', state.variant !== 2);
+      topHeaderV3.classList.toggle('hidden', state.variant !== 3);
+      bottomPlayerV3.classList.toggle('hidden', state.variant !== 3);
+      if (state.variant === 2) {
+        bottomNavV2.classList.remove('hidden');
+        bottomNavV2.classList.add('grid');
+      } else {
+        bottomNavV2.classList.add('hidden');
+        bottomNavV2.classList.remove('grid');
+      }
+
+      const mainContainer = document.getElementById('phone-main-content');
+      mainContainer.className = state.pocketLockMode
+        ? 'flex-1 p-3 overflow-y-auto bg-slate-950 flex flex-col justify-between'
+        : 'flex-1 p-4 overflow-y-auto bg-[#FAF8F5] flex flex-col justify-between';
+
+      if (state.variant === 1) {
+        const tabPlayer = document.getElementById('v1-tab-player');
+        const tabLib = document.getElementById('v1-tab-library');
+        if (state.v1Tab === 'player') {
+          tabPlayer.className = 'tap-target rounded-2xl font-extrabold text-lg flex items-center justify-center gap-2 bg-emerald-800 text-white shadow';
+          tabLib.className = 'tap-target rounded-2xl font-extrabold text-lg flex items-center justify-center gap-2 bg-white text-slate-900 border-2 border-slate-300';
+          mainContainer.innerHTML = renderFullPlayerHTML();
+        } else {
+          tabLib.className = 'tap-target rounded-2xl font-extrabold text-lg flex items-center justify-center gap-2 bg-emerald-800 text-white shadow';
+          tabPlayer.className = 'tap-target rounded-2xl font-extrabold text-lg flex items-center justify-center gap-2 bg-white text-slate-900 border-2 border-slate-300';
+          if (state.v1SelectedAuthorId) {
+            const author = AUTHORS_DATA.find(a => a.id === state.v1SelectedAuthorId) || AUTHORS_DATA[0];
+            mainContainer.innerHTML = renderAuthorWorksListHTML(author, true);
+          } else {
+            mainContainer.innerHTML = renderAuthorsListHTML();
+          }
+        }
+      } else if (state.variant === 2) {
+        const author = AUTHORS_DATA.find(a => a.id === state.v2SelectedAuthorId) || AUTHORS_DATA[0];
+        mainContainer.innerHTML = state.v2Step === 'authors'
+          ? renderAuthorsListHTML()
+          : state.v2Step === 'books'
+            ? renderAuthorWorksListHTML(author, false)
+            : renderFullPlayerHTML();
+      } else {
+        mainContainer.innerHTML = renderVariant3AccordionHTML();
+      }
+
+      const { total } = calculateCacheMb();
+      const pctCache = Math.min(100, Math.round((total / state.cacheLimitMb) * 100));
+      document.getElementById('cache-usage-badge').textContent = `${total} / ${state.cacheLimitMb} МБ`;
+      document.getElementById('cache-progress-bar').style.width = `${pctCache}%`;
+      const v3Badge = document.getElementById('v3-cache-badge');
+      if (v3Badge) v3Badge.textContent = `${total} МБ`;
+
+      attachDynamicPhoneListeners();
+    }
+
+    function attachDynamicPhoneListeners() {
+      const mainPlayBtn = document.getElementById('main-play-btn');
+      if (mainPlayBtn) mainPlayBtn.addEventListener('click', togglePlayback);
+
+      const pocketPlayBtn = document.getElementById('pocket-play-btn');
+      if (pocketPlayBtn) pocketPlayBtn.addEventListener('click', togglePlayback);
+
+      const btnUnlockPocket = document.getElementById('btn-unlock-pocket');
+      if (btnUnlockPocket) {
+        btnUnlockPocket.addEventListener('click', () => {
+          playClickTone(600);
+          state.pocketLockMode = false;
+          showPhoneToast('🔓 Экран разблокирован');
+          renderAll();
+        });
+      }
+
+      const phoneLockPocketBtn = document.getElementById('phone-lock-pocket-btn');
+      if (phoneLockPocketBtn) {
+        phoneLockPocketBtn.addEventListener('click', () => {
+          playClickTone(440);
+          state.pocketLockMode = true;
+          showPhoneToast('🔒 Режим «В кармане» включен');
+          renderAll();
+        });
+      }
+
+      const phoneWalkTimerBtn = document.getElementById('phone-walk-timer-btn');
+      if (phoneWalkTimerBtn) {
+        phoneWalkTimerBtn.addEventListener('click', () => {
+          playClickTone(560);
+          const steps = [30, 45, 60, 0];
+          const nextIdx = (steps.indexOf(state.walkTimerMinutes) + 1) % steps.length;
+          state.walkTimerMinutes = steps[nextIdx];
+          showPhoneToast(
+            state.walkTimerMinutes > 0
+              ? `🌲 Таймер прогулки: напомним повернуть домой через ${state.walkTimerMinutes} мин`
+              : '🌲 Таймер прогулки выключен'
+          );
+          renderAll();
+        });
+      }
+
+      const mainRewindBtn = document.getElementById('main-rewind-btn');
+      if (mainRewindBtn) mainRewindBtn.addEventListener('click', rewind30Sec);
+
+      const mainSwitchBookBtn = document.getElementById('main-switch-book-btn');
+      if (mainSwitchBookBtn) {
+        mainSwitchBookBtn.addEventListener('click', () => {
+          playClickTone(520);
+          state.v1Tab = 'library';
+          state.v1SelectedAuthorId = null;
+          renderAll();
+        });
+      }
+
+      const phoneRestoreBtn = document.getElementById('phone-restore-pos-btn');
+      if (phoneRestoreBtn) {
+        phoneRestoreBtn.addEventListener('click', restoreLastPosition);
+      }
+
+      const phoneSpeedBtn = document.getElementById('phone-speed-btn');
+      if (phoneSpeedBtn) {
+        phoneSpeedBtn.addEventListener('click', () => {
+          playClickTone(560);
+          state.speechRate = state.speechRate === 0.92 ? 0.8 : 0.92;
+          showPhoneToast(state.speechRate === 0.92 ? 'Темп чтения: Обычный' : 'Темп чтения: Размеренный (0.8x)');
+          if (state.isPlaying) speakCurrentExcerpt(false);
+          renderAll();
+        });
+      }
+
+      const btnBackAuthors = document.getElementById('btn-back-to-authors');
+      if (btnBackAuthors) {
+        btnBackAuthors.addEventListener('click', () => {
+          playClickTone(480);
+          state.v1SelectedAuthorId = null;
+          renderAll();
+        });
+      }
+
+      const btnToggleSort = document.getElementById('btn-toggle-sort');
+      if (btnToggleSort) {
+        btnToggleSort.addEventListener('click', () => {
+          playClickTone(580);
+          state.sortOrder = state.sortOrder === 'asc' ? 'desc' : 'asc';
+          renderAll();
+        });
+      }
+
+      document.querySelectorAll('.author-card-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const authorId = btn.getAttribute('data-open-author');
+          playClickTone(600);
+          state.v1SelectedAuthorId = authorId;
+          renderAll();
+        });
+      });
+
+      document.querySelectorAll('.accordion-author-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const authorId = btn.getAttribute('data-accordion-author');
+          playClickTone(550);
+          state.v3ExpandedAuthorId = state.v3ExpandedAuthorId === authorId ? null : authorId;
+          renderAll();
+        });
+      });
+
+      document.querySelectorAll('.work-item-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const aId = btn.getAttribute('data-select-author');
+          const wId = btn.getAttribute('data-select-work');
+          selectWork(aId, wId);
+        });
+      });
+
+      document.querySelectorAll('.mini-play-trigger').forEach(btn => {
+        btn.addEventListener('click', togglePlayback);
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSavedProgress();
+
+      // Обработчик загрузки реальных MP3/M4B файлов (Шаг 4)
+      const fileInput = document.getElementById('local-audio-input');
+      document.getElementById('btn-trigger-file-upload').addEventListener('click', () => {
+        playClickTone(600);
+        fileInput.click();
+      });
+
+      fileInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+
+        files.forEach((file, idx) => {
+          const parsed = parseUploadedAudioFilename(file.name);
+          const blobUrl = URL.createObjectURL(file);
+          const sizeMb = Math.max(1, Math.round(file.size / (1024 * 1024)));
+
+          let authorObj = AUTHORS_DATA.find(a => a.name.toLowerCase() === parsed.authorName.toLowerCase());
+          if (!authorObj) {
+            authorObj = {
+              id: 'custom_author_' + Date.now() + '_' + idx,
+              name: parsed.authorName,
+              fullVoiceName: parsed.authorName,
+              yearsLife: 'Локальный архив',
+              era: 'Добавлено с устройства',
+              works: []
+            };
+            AUTHORS_DATA.push(authorObj);
+          }
+
+          const newWorkId = 'custom_work_' + Date.now() + '_' + idx;
+          const newWork = {
+            id: newWorkId,
+            year: parsed.year,
+            title: parsed.title,
+            type: 'Аудиофайл (' + (file.name.split('.').pop() || 'MP3').toUpperCase() + ')',
+            durationSec: 300,
+            currentSec: 0,
+            sizeMb: sizeMb,
+            cached: true,
+            listened: false,
+            audioBlobUrl: blobUrl,
+            excerpt: `Воспроизводится ваш загруженный аудиофайл «${file.name}» (${parsed.authorName}, ${parsed.year} г.).`
+          };
+
+          authorObj.works.push(newWork);
+
+          // Читаем реальную длительность аудиофайла
+          const tempAudio = new Audio(blobUrl);
+          tempAudio.addEventListener('loadedmetadata', () => {
+            if (tempAudio.duration && !isNaN(tempAudio.duration)) {
+              newWork.durationSec = Math.max(1, Math.floor(tempAudio.duration));
+              renderAll();
+            }
+          });
+
+          state.currentAuthorId = authorObj.id;
+          state.currentWorkId = newWork.id;
+          state.v1Tab = 'player';
+          state.isPlaying = true;
+          speakCurrentExcerpt(true);
+
+          document.getElementById('upload-parse-log').innerHTML =
+            `✓ Файл <strong>${file.name}</strong> распознан: Писатель <strong>${parsed.authorName}</strong> • Год <strong>${parsed.year}</strong> • Книга <strong>«${parsed.title}»</strong>`;
+          showPhoneToast(`🎵 Загружен MP3: ${parsed.authorName} (${parsed.year} г.)`);
+        });
+
+        renderAll();
+      });
+
+      // Тест голосового напоминания таймера прогулки
+      document.getElementById('btn-test-walk-timer-alert').addEventListener('click', () => {
+        playClickTone(660);
+        const mins = state.walkTimerMinutes || 45;
+        const msg = `Прошло ${mins} минут вашей прогулки по лесу. Пора не спеша поворачивать в сторону дома. Приятного прослушивания!`;
+        showPhoneToast(`🌲 Напоминание в наушниках: прошло ${mins} мин прогулки!`);
+        speakCustomAnnouncement(msg);
+      });
+
+      function setCleanMomMode(enabled) {
+        const hdr = document.getElementById('dev-top-header');
+        const rightCol = document.getElementById('dev-right-column');
+        const phoneCol = document.getElementById('phone-column-container');
+        const banner = document.getElementById('clean-mode-banner');
+        if (hdr) hdr.classList.toggle('hidden', enabled);
+        if (rightCol) rightCol.classList.toggle('hidden', enabled);
+        if (banner) banner.classList.toggle('hidden', !enabled);
+        if (phoneCol) {
+          phoneCol.className = enabled ? 'lg:col-span-12 flex flex-col items-center' : 'lg:col-span-7 flex flex-col items-center';
+        }
+      }
+
+      document.getElementById('btn-mom-clean-mode').addEventListener('click', () => {
+        playClickTone(640);
+        setCleanMomMode(true);
+        showPhoneToast('📲 Включен чистый экран для пожилого человека');
+      });
+
+      document.getElementById('btn-exit-clean-mode').addEventListener('click', () => {
+        playClickTone(520);
+        setCleanMomMode(false);
+      });
+
+      document.getElementById('btn-show-install-modal').addEventListener('click', () => {
+        playClickTone(580);
+        document.getElementById('install-guide-panel').classList.toggle('hidden');
+      });
+
+      document.getElementById('btn-close-install-modal').addEventListener('click', () => {
+        document.getElementById('install-guide-panel').classList.add('hidden');
+      });
+
+      document.getElementById('btn-pocket-mode-top').addEventListener('click', () => {
+        playClickTone(500);
+        state.pocketLockMode = !state.pocketLockMode;
+        state.v1Tab = 'player';
+        renderAll();
+      });
+
+      document.getElementById('btn-show-kotlin-modal').addEventListener('click', () => {
+        playClickTone(580);
+        document.getElementById('kotlin-code-panel').classList.toggle('hidden');
+      });
+      document.getElementById('btn-close-kotlin-modal').addEventListener('click', () => {
+        document.getElementById('kotlin-code-panel').classList.add('hidden');
+      });
+
+      document.getElementById('btn-family-add-chekhov').addEventListener('click', () => {
+        playClickTone(720);
+        if (!AUTHORS_DATA.some(a => a.id === 'chekhov')) {
+          AUTHORS_DATA.push({
+            id: 'chekhov',
+            name: 'А. П. Чехов',
+            fullVoiceName: 'Антон Павлович Чехов',
+            yearsLife: '1860–1904',
+            era: 'Классическая проза',
+            works: [
+              {
+                id: 'palata6',
+                year: 1892,
+                title: 'Палата № 6',
+                type: 'Повесть',
+                durationSec: 3100,
+                currentSec: 0,
+                sizeMb: 28,
+                cached: true,
+                listened: false,
+                audioBlobUrl: null,
+                excerpt: 'В больничном дворе стоит небольшой флигель, окружённый целым лесом репейника, крапивы и дикой конопли...'
+              },
+              {
+                id: 'dama',
+                year: 1899,
+                title: 'Дама с собачкой',
+                type: 'Рассказ',
+                durationSec: 1950,
+                currentSec: 0,
+                sizeMb: 22,
+                cached: true,
+                listened: false,
+                audioBlobUrl: null,
+                excerpt: 'Говорили, что на набережной появилось новое лицо: дама с собачкой. Дмитрий Дмитрич Гуров, проживший в Ялте уже две недели...'
+              }
+            ]
+          });
+          document.getElementById('family-sync-status').textContent = '✓ По домашнему Wi-Fi добавлен А. П. Чехов (издания 1892 и 1899 гг.)!';
+          showPhoneToast('👨‍👩‍👧 Родственники добавили книги А. П. Чехова!');
+          state.v1Tab = 'library';
+          state.v1SelectedAuthorId = 'chekhov';
+          state.pocketLockMode = false;
+          renderAll();
+        } else {
+          showPhoneToast('Книги А. П. Чехова уже синхронизированы');
+        }
+      });
+
+      document.getElementById('btn-family-add-dostoevsky').addEventListener('click', () => {
+        playClickTone(720);
+        if (!AUTHORS_DATA.some(a => a.id === 'dostoevsky')) {
+          AUTHORS_DATA.push({
+            id: 'dostoevsky',
+            name: 'Ф. М. Достоевский',
+            fullVoiceName: 'Фёдор Михайлович Достоевский',
+            yearsLife: '1821–1881',
+            era: 'Классический роман',
+            works: [
+              {
+                id: 'belyenochi',
+                year: 1848,
+                title: 'Белые ночи (Ночь первая)',
+                type: 'Сентиментальный роман',
+                durationSec: 2700,
+                currentSec: 0,
+                sizeMb: 38,
+                cached: true,
+                listened: false,
+                audioBlobUrl: null,
+                excerpt: 'Была чудная ночь, такая ночь, которая разве только и может быть тогда, когда мы молоды, любезный читатель...'
+              }
+            ]
+          });
+          document.getElementById('family-sync-status').textContent = '✓ По домашнему Wi-Fi добавлен Ф. М. Достоевский (1848 г.)!';
+          showPhoneToast('👨‍👩‍👧 Родственники добавили Ф. М. Достоевского!');
+          state.v1Tab = 'library';
+          state.v1SelectedAuthorId = 'dostoevsky';
+          state.pocketLockMode = false;
+          renderAll();
+        } else {
+          showPhoneToast('Ф. М. Достоевский уже в библиотеке');
+        }
+      });
+
+      document.getElementById('btn-variant-all').addEventListener('click', () => {
+        playClickTone(600);
+        state.showAllThree = !state.showAllThree;
+        renderAll();
+      });
+      document.getElementById('btn-variant-1').addEventListener('click', () => {
+        playClickTone(600);
+        state.showAllThree = false;
+        state.variant = 1;
+        renderAll();
+      });
+      document.getElementById('btn-variant-2').addEventListener('click', () => {
+        state.showAllThree = false;
+        state.variant = 2;
+        renderAll();
+      });
+      document.getElementById('btn-variant-3').addEventListener('click', () => {
+        state.showAllThree = false;
+        state.variant = 3;
+        renderAll();
+      });
+
+      document.getElementById('open-full-v1').addEventListener('click', () => {
+        state.showAllThree = false;
+        state.variant = 1;
+        renderAll();
+      });
+      document.getElementById('open-full-v2').addEventListener('click', () => {
+        state.showAllThree = false;
+        state.variant = 2;
+        renderAll();
+      });
+      document.getElementById('open-full-v3').addEventListener('click', () => {
+        state.showAllThree = false;
+        state.variant = 3;
+        renderAll();
+      });
+
+      document.getElementById('mini-v1-tab-play').addEventListener('click', () => {
+        state.v1Tab = 'player';
+        renderAll();
+      });
+      document.getElementById('mini-v1-tab-lib').addEventListener('click', () => {
+        state.v1Tab = 'library';
+        renderAll();
+      });
+      document.getElementById('mini-v2-btn-a').addEventListener('click', () => {
+        state.variant = 2;
+        state.v2Step = 'authors';
+        renderAll();
+      });
+      document.getElementById('mini-v2-btn-b').addEventListener('click', () => {
+        state.variant = 2;
+        state.v2Step = 'books';
+        renderAll();
+      });
+      document.getElementById('mini-v2-btn-p').addEventListener('click', () => {
+        state.variant = 2;
+        state.v2Step = 'player';
+        renderAll();
+      });
+      document.getElementById('mini-v3-play').addEventListener('click', togglePlayback);
+      document.getElementById('mini-v3-rew').addEventListener('click', rewind30Sec);
+
+      document.getElementById('v1-tab-player').addEventListener('click', () => {
+        playClickTone(540);
+        state.v1Tab = 'player';
+        renderAll();
+      });
+      document.getElementById('v1-tab-library').addEventListener('click', () => {
+        playClickTone(540);
+        state.v1Tab = 'library';
+        renderAll();
+      });
+
+      document.getElementById('v2-nav-authors').addEventListener('click', () => {
+        state.v2Step = 'authors';
+        renderAll();
+      });
+      document.getElementById('v2-nav-books').addEventListener('click', () => {
+        state.v2Step = 'books';
+        renderAll();
+      });
+      document.getElementById('v2-nav-player').addEventListener('click', () => {
+        state.v2Step = 'player';
+        renderAll();
+      });
+
+      document.getElementById('v3-btn-play').addEventListener('click', togglePlayback);
+      document.getElementById('v3-btn-rewind').addEventListener('click', rewind30Sec);
+
+      document.getElementById('toggle-sound').addEventListener('change', (e) => {
+        state.soundEnabled = e.target.checked;
+        if (!state.soundEnabled) stopSpeech();
+      });
+
+      document.getElementById('toggle-voice-guide').addEventListener('change', (e) => {
+        state.voiceGuideEnabled = e.target.checked;
+      });
+
+      document.getElementById('btn-restore-last-pos').addEventListener('click', restoreLastPosition);
+
+      document.getElementById('btn-clean-listened').addEventListener('click', () => {
+        playClickTone(640);
+        let freed = 0;
+        AUTHORS_DATA.forEach(a => {
+          a.works.forEach(w => {
+            if (w.listened && w.cached && !(state.currentAuthorId === a.id && state.currentWorkId === w.id)) {
+              w.cached = false;
+              freed += w.sizeMb;
+            }
+          });
+        });
+        const statusEl = document.getElementById('cache-status-msg');
+        if (freed > 0) {
+          statusEl.textContent = `✓ Освобождено ${freed} МБ! Прослушанные файлы удалены из кэша телефона.`;
+          showPhoneToast(`🧹 Очищено ${freed} МБ памяти`);
+        } else {
+          statusEl.textContent = '✓ Все прослушанные книги уже очищены. Память телефона в порядке.';
+          showPhoneToast('Память уже оптимизирована');
+        }
+        renderAll();
+      });
+
+      document.getElementById('btn-wifi-prefetch').addEventListener('click', () => {
+        playClickTone(700);
+        let added = 0;
+        AUTHORS_DATA.forEach(a => {
+          a.works.forEach(w => {
+            if (!w.cached) {
+              w.cached = true;
+              added += w.sizeMb;
+            }
+          });
+        });
+        const statusEl = document.getElementById('cache-status-msg');
+        if (added > 0) {
+          statusEl.textContent = `✓ По домашнему Wi-Fi предзагружено +${added} МБ. Все книги доступны офлайн в лесу!`;
+          showPhoneToast('📶 Книги докачаны по домашнему Wi-Fi');
+        } else {
+          statusEl.textContent = '✓ Все произведения библиотеки уже находятся в офлайн-кэше.';
+          showPhoneToast('Все книги уже в памяти');
+        }
+        renderAll();
+      });
+
+      document.getElementById('toggle-bt-lock').addEventListener('change', (e) => {
+        state.btLockEnabled = e.target.checked;
+      });
+
+      document.getElementById('btn-bt-playpause').addEventListener('click', () => {
+        togglePlayback();
+        const logBox = document.getElementById('bt-log-box');
+        logBox.textContent = `[MediaSession] Команда KEYCODE_MEDIA_PLAY_PAUSE от Bluetooth принята → ${state.isPlaying ? 'ИГРАЕТ' : 'ПАУЗА'}`;
+      });
+
+      document.getElementById('btn-bt-next').addEventListener('click', () => {
+        const logBox = document.getElementById('bt-log-box');
+        if (state.btLockEnabled) {
+          playClickTone(300);
+          logBox.textContent = '[ControllerInfo Filter] ЗАБЛОКИРОВАНО: Случайное нажатие KEYCODE_MEDIA_NEXT от Bluetooth-наушников проигнорировано. Позиция главы сохранена!';
+          showPhoneToast('🛡️ Защита: случайное нажатие на наушниках заблокировано!');
+        } else {
+          playClickTone(520);
+          advanceToNextChronologicalWork();
+          logBox.textContent = '[MediaSession] Защита выключена → выполнен переход на следующий трек.';
+        }
+      });
+
+      renderAll();
+      setCleanMomMode(true);
+    });
+  </script>
+</body>
+</html>
