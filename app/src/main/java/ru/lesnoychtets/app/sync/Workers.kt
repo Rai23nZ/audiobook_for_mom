@@ -17,14 +17,10 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import ru.lesnoychtets.app.data.AppPrefs
 import ru.lesnoychtets.app.data.CatalogBook
 import ru.lesnoychtets.app.data.GoogleDriveFolder
 import ru.lesnoychtets.app.data.LibraryRepository
 import ru.lesnoychtets.app.data.LibrivoxDownloader
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 private const val CHANNEL_ID = "downloads"
@@ -36,7 +32,7 @@ private fun foregroundInfo(context: Context, id: Int, text: String): ForegroundI
     }
     val notification = NotificationCompat.Builder(context, CHANNEL_ID)
         .setSmallIcon(android.R.drawable.stat_sys_download)
-        .setContentTitle("Лесной Чтец")
+        .setContentTitle("Вслух")
         .setContentText(text)
         .setOngoing(true)
         .setSilent(true)
@@ -57,32 +53,22 @@ private suspend fun CoroutineWorker.tryForeground(id: Int, text: String) {
     }
 }
 
-private fun networkConstraints(): Constraints = Constraints.Builder()
-    .setRequiredNetworkType(if (AppPrefs.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
+/** Всё скачивается только по Wi-Fi (сеть без ограничения трафика). */
+private fun wifiOnly(): Constraints = Constraints.Builder()
+    .setRequiredNetworkType(NetworkType.UNMETERED)
     .build()
 
 /** Синхронизация семейной папки Google Drive. */
 class DriveSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        val link = AppPrefs.driveLink
-        if (link.isBlank()) return Result.success()
-        AppPrefs.syncRunning.value = true
-        tryForeground(1001, "Синхронизация семейной папки")
+        tryForeground(1001, "Обновление книг")
         return try {
-            val r = GoogleDriveFolder.sync(applicationContext, link) { AppPrefs.setSyncMessage("⏳ $it") }
+            GoogleDriveFolder.sync(applicationContext)
             LibraryRepository.rescan(applicationContext)
-            val time = SimpleDateFormat("d MMM HH:mm", Locale("ru")).format(Date())
-            AppPrefs.setSyncMessage(
-                "✓ $time: в папке ${r.total} файлов, скачано новых ${r.downloaded}" +
-                    (if (r.removed > 0) ", удалено ${r.removed}" else ""),
-            )
             Result.success()
         } catch (e: Exception) {
-            AppPrefs.setSyncMessage("⚠ Ошибка синхронизации: ${e.message}")
             LibraryRepository.rescan(applicationContext)
             if (runAttemptCount < 2) Result.retry() else Result.failure()
-        } finally {
-            AppPrefs.syncRunning.value = false
         }
     }
 
@@ -90,24 +76,35 @@ class DriveSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
         private const val PERIODIC = "drive_sync_periodic"
         private const val NOW = "drive_sync_now"
 
-        /** Регулярная проверка папки раз в 6 часов (по умолчанию — только по Wi-Fi). */
+        /** Проверка папки раз в 6 часов и сразу при запуске приложения — по Wi-Fi. */
         fun schedule(context: Context) {
             val wm = WorkManager.getInstance(context)
-            if (AppPrefs.driveLink.isBlank()) {
-                wm.cancelUniqueWork(PERIODIC)
-                return
-            }
-            val request = PeriodicWorkRequestBuilder<DriveSyncWorker>(6, TimeUnit.HOURS)
-                .setConstraints(networkConstraints())
+            val periodic = PeriodicWorkRequestBuilder<DriveSyncWorker>(6, TimeUnit.HOURS)
+                .setConstraints(wifiOnly())
                 .build()
-            wm.enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.UPDATE, request)
+            wm.enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.UPDATE, periodic)
+            syncNow(context, ExistingWorkPolicy.KEEP)
         }
 
-        fun syncNow(context: Context) {
-            val request = OneTimeWorkRequestBuilder<DriveSyncWorker>()
-                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-                .build()
-            WorkManager.getInstance(context).enqueueUniqueWork(NOW, ExistingWorkPolicy.REPLACE, request)
+        fun syncNow(context: Context, policy: ExistingWorkPolicy = ExistingWorkPolicy.REPLACE) {
+            val request = OneTimeWorkRequestBuilder<DriveSyncWorker>().setConstraints(wifiOnly()).build()
+            WorkManager.getInstance(context).enqueueUniqueWork(NOW, policy, request)
+        }
+    }
+}
+
+/** Удаление из телефона книг, дослушанных накануне и раньше. */
+class CleanupWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result {
+        LibraryRepository.removeListened(applicationContext)
+        return Result.success()
+    }
+
+    companion object {
+        fun schedule(context: Context) {
+            val request = PeriodicWorkRequestBuilder<CleanupWorker>(6, TimeUnit.HOURS).build()
+            WorkManager.getInstance(context)
+                .enqueueUniquePeriodicWork("cleanup_listened", ExistingPeriodicWorkPolicy.KEEP, request)
         }
     }
 }
@@ -147,7 +144,7 @@ class LibrivoxDownloadWorker(context: Context, params: WorkerParameters) : Corou
 
         fun enqueue(context: Context, book: CatalogBook) {
             val request = OneTimeWorkRequestBuilder<LibrivoxDownloadWorker>()
-                .setConstraints(networkConstraints())
+                .setConstraints(wifiOnly())
                 .addTag(TAG)
                 .addTag(ID_TAG_PREFIX + book.id)
                 .setInputData(

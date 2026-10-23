@@ -92,8 +92,6 @@ object LibrivoxDownloader {
 
     fun bookDir(context: Context, id: String) = File(LibraryRepository.librivoxDir(context), Http.safeFileName(id))
 
-    fun isDownloaded(context: Context, id: String) = File(bookDir(context, id), META_FILE).exists()
-
     /** Из всех форматов выбираем стандартный для LibriVox «64Kbps MP3» — он компактный и годится для речи. */
     fun pickMp3(filesJson: String): List<RemoteFile> {
         val arr = JSONObject(filesJson).getJSONArray("result")
@@ -110,6 +108,8 @@ object LibrivoxDownloader {
         require(files.isNotEmpty()) { "В записи нет MP3-файлов" }
         val dir = bookDir(context, book.id)
         dir.mkdirs()
+        // Повторное скачивание прослушанной книги: пока не докачана, считаем её неполной.
+        if (File(dir, META_FILE).exists()) writeMeta(dir, book, complete = false)
         files.forEachIndexed { i, f ->
             onProgress(i, files.size)
             val target = File(dir, Http.safeFileName(f.name))
@@ -119,12 +119,17 @@ object LibrivoxDownloader {
         }
         onProgress(files.size, files.size)
         // Описание пишется последним: пока его нет, недокачанная книга не появляется в библиотеке.
+        writeMeta(dir, book, complete = true)
+    }
+
+    private fun writeMeta(dir: File, book: CatalogBook, complete: Boolean) {
         File(dir, META_FILE).writeText(
             JSONObject().apply {
                 put("id", book.id)
                 put("author", book.author)
                 put("title", book.title)
                 book.year?.let { put("year", it) }
+                put("complete", complete)
                 put("source", "LibriVox / Internet Archive (Public Domain)")
             }.toString(),
         )

@@ -1,6 +1,7 @@
 package ru.lesnoychtets.app.data
 
 import android.content.Context
+import android.net.Uri
 import java.io.File
 import java.io.IOException
 
@@ -9,6 +10,9 @@ import java.io.IOException
  * Список файлов берётся со встраиваемой страницы папки, файлы — по прямой ссылке скачивания.
  */
 object GoogleDriveFolder {
+    /** Семейная папка «КнигиДляМамы» — вшита в приложение, поменять её нельзя. */
+    const val FAMILY_FOLDER_ID = "1v4YiyBAaBq5ptGEqFQty0S0RDrFY1m4a"
+
     data class Entry(val id: String, val name: String, val isFolder: Boolean)
 
     private val FOLDER_IN_LINK = Regex("""folders/([A-Za-z0-9_-]{10,})""")
@@ -32,8 +36,12 @@ object GoogleDriveFolder {
             Entry(id, name, chunk.contains("/folders/$id") || chunk.contains("/drive/folders/"))
         }
 
-    fun list(folderId: String): List<Entry> =
-        parseListing(Http.getText("https://drive.google.com/embeddedfolderview?id=$folderId#list"))
+    /** Если вместо списка пришла другая страница (нет доступа, сбой), бросаем ошибку, а не «пустую папку». */
+    fun list(folderId: String): List<Entry> {
+        val html = Http.getText("https://drive.google.com/embeddedfolderview?id=$folderId")
+        if (!html.contains("flip-entries")) throw IOException("Google Drive не отдал список папки")
+        return parseListing(html)
+    }
 
     fun downloadUrl(fileId: String) =
         "https://drive.usercontent.google.com/download?id=$fileId&export=download&confirm=t"
@@ -49,18 +57,18 @@ object GoogleDriveFolder {
             .replace("&nbsp;", " ")
             .replace("&amp;", "&")
 
-    /** Результат синхронизации для сообщения родственнику. */
+    /** Результат синхронизации (для журнала). */
     data class SyncResult(val total: Int, val downloaded: Int, val removed: Int)
 
     /**
-     * Повторяет содержимое папки Drive в памяти телефона: докачивает новые аудиофайлы
-     * и удаляет те, что убрали из облака. Если список пуст (нет доступа, ошибка), ничего не удаляет.
+     * Повторяет содержимое семейной папки в памяти телефона: докачивает новые аудиофайлы
+     * и удаляет те, что убрали из облака. Книги, дослушанные не сегодня, заново не скачиваются.
+     * Если список получить не удалось, бросается ошибка и ничего не удаляется.
      */
-    fun sync(context: Context, link: String, onProgress: (String) -> Unit): SyncResult {
-        val rootId = extractFolderId(link) ?: throw IOException("Не похоже на ссылку на папку Google Drive")
+    fun sync(context: Context, folderId: String = FAMILY_FOLDER_ID): SyncResult {
         val remote = LinkedHashMap<String, String>() // относительный путь -> id файла
-        fun collect(folderId: String, prefix: String, depth: Int) {
-            list(folderId).forEach { e ->
+        fun collect(id: String, prefix: String, depth: Int) {
+            list(id).forEach { e ->
                 val safe = Http.safeFileName(e.name)
                 if (e.isFolder) {
                     if (depth < 4) collect(e.id, "$prefix$safe/", depth + 1)
@@ -69,17 +77,20 @@ object GoogleDriveFolder {
                 }
             }
         }
-        collect(rootId, "", 0)
-        if (remote.isEmpty()) {
-            throw IOException("В папке не найдено аудиофайлов. Проверьте, что доступ открыт «всем, у кого есть ссылка».")
-        }
+        collect(folderId, "", 0)
+        LibraryRepository.writeManifest(context, remote.keys)
 
         val root = LibraryRepository.driveDir(context)
+        val today = ProgressStore.todayStart()
+        val skip = LibraryRepository.driveBooks(context, remote.keys)
+            .filter { ProgressStore.get(it.key)?.finishedBefore(today) == true }
+            .flatMap { b -> b.tracks.map { Uri.parse(it.uri).path } }
+            .toSet()
+
         var downloaded = 0
-        remote.entries.forEachIndexed { i, (path, id) ->
+        remote.forEach { (path, id) ->
             val target = File(root, path)
-            if (target.exists() && target.length() > 0) return@forEachIndexed
-            onProgress("Скачивание ${i + 1} из ${remote.size}: ${target.name}")
+            if (target.path in skip || (target.exists() && target.length() > 0)) return@forEach
             Http.download(downloadUrl(id), target)
             downloaded++
         }

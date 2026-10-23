@@ -2,8 +2,6 @@ package ru.lesnoychtets.app.data
 
 import android.content.Context
 import android.net.Uri
-import android.provider.DocumentsContract
-import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,17 +14,16 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * Библиотека собирается из трёх мест:
- *  1. папка на телефоне, выбранная родственником (через системный выбор папки);
- *  2. копия семейной папки Google Drive;
- *  3. книги, скачанные из каталога LibriVox.
+ * Библиотека собирается из двух мест:
+ *  1. семейная папка Google Drive (список её файлов хранится в манифесте, поэтому
+ *     книга остаётся в списке и после удаления прослушанных файлов с телефона);
+ *  2. книги, скачанные из каталога LibriVox.
  */
 object LibraryRepository {
-    private const val TAG = "LibraryRepository"
+    private const val MANIFEST = ".manifest.json"
 
     private val state = MutableStateFlow<List<Book>>(emptyList())
     val books: StateFlow<List<Book>> = state.asStateFlow()
-    val scanning = MutableStateFlow(false)
 
     private val mutex = Mutex()
     private lateinit var cacheFile: File
@@ -43,73 +40,69 @@ object LibraryRepository {
 
     fun find(key: String?): Book? = key?.let { k -> state.value.firstOrNull { it.key == k } }
 
+    /** Список файлов семейной папки с последней синхронизации (относительные пути). */
+    fun readManifest(context: Context): List<String> = runCatching {
+        val arr = JSONArray(File(driveDir(context), MANIFEST).readText())
+        (0 until arr.length()).map { arr.getString(it) }
+    }.getOrDefault(emptyList())
+
+    fun writeManifest(context: Context, paths: Collection<String>) {
+        val dir = driveDir(context)
+        dir.mkdirs()
+        File(dir, MANIFEST).writeText(JSONArray(paths.toList()).toString())
+    }
+
+    /** Книги семейной папки по списку путей (скачанные и нет). */
+    fun driveBooks(context: Context, paths: Collection<String>): List<Book> {
+        val root = driveDir(context)
+        val files = paths.map { rel ->
+            val parts = rel.split('/')
+            ScannedFile(Uri.fromFile(File(root, rel)).toString(), parts.dropLast(1), parts.last())
+        }
+        return LibraryBuilder.build(files).values.toList()
+    }
+
     suspend fun rescan(context: Context) = withContext(Dispatchers.IO) {
         mutex.withLock {
-            scanning.value = true
-            try {
-                val result = LinkedHashMap<String, Book>()
-                AppPrefs.treeUri?.let { LibraryBuilder.build(scanTree(context, Uri.parse(it)), result) }
-                LibraryBuilder.build(scanDir(driveDir(context)), result)
-                scanLibrivox(librivoxDir(context), result)
-                val list = result.values.toList()
-                state.value = list
-                runCatching { cacheFile.writeText(toJson(list)) }
-            } finally {
-                scanning.value = false
+            val result = LinkedHashMap<String, Book>()
+            val root = driveDir(context)
+            val paths = (readManifest(context) + localDriveFiles(root)).toSortedSet()
+            driveBooks(context, paths).forEach { b ->
+                result.putIfAbsent(b.key, b.copy(downloaded = b.tracks.all { fileOf(it).let { f -> f.isFile && f.length() > 0 } }))
             }
+            scanLibrivox(librivoxDir(context), result)
+            val list = result.values.toList()
+            state.value = list
+            runCatching { cacheFile.writeText(toJson(list)) }
         }
     }
 
-    private fun scanTree(context: Context, treeUri: Uri): List<ScannedFile> {
-        val out = mutableListOf<ScannedFile>()
-        val resolver = context.contentResolver
-        fun walk(docId: String, dirs: List<String>) {
-            if (dirs.size > 6) return
-            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, docId)
-            val subdirs = mutableListOf<Pair<String, String>>()
-            resolver.query(
-                childrenUri,
-                arrayOf(
-                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                    DocumentsContract.Document.COLUMN_MIME_TYPE,
-                ),
-                null, null, null,
-            )?.use { c ->
-                while (c.moveToNext()) {
-                    val id = c.getString(0) ?: continue
-                    val name = c.getString(1) ?: continue
-                    if (name.startsWith(".")) continue
-                    if (c.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR) {
-                        subdirs += id to name
-                    } else if (FilenameParser.isAudio(name)) {
-                        out += ScannedFile(DocumentsContract.buildDocumentUriUsingTree(treeUri, id).toString(), dirs, name)
-                    }
-                }
+    /**
+     * Удаляет из телефона файлы книг, дослушанных до конца не сегодня.
+     * Сама книга остаётся в списке с меткой «ПРОСЛУШАНО».
+     */
+    suspend fun removeListened(context: Context) = withContext(Dispatchers.IO) {
+        val today = ProgressStore.todayStart()
+        var removed = false
+        state.value.filter { it.downloaded && ProgressStore.get(it.key)?.finishedBefore(today) == true }.forEach { book ->
+            book.tracks.forEach { t -> if (fileOf(t).delete()) removed = true }
+        }
+        if (removed) {
+            driveDir(context).walkBottomUp().forEach { f ->
+                if (f.isDirectory && f != driveDir(context) && f.list()?.isEmpty() == true) f.delete()
             }
-            subdirs.forEach { (id, name) -> walk(id, dirs + name) }
+            rescan(context)
         }
-        try {
-            walk(DocumentsContract.getTreeDocumentId(treeUri), emptyList())
-        } catch (e: Exception) {
-            Log.w(TAG, "Не удалось прочитать папку $treeUri", e)
-        }
-        return out
     }
 
-    private fun scanDir(root: File): List<ScannedFile> {
-        val out = mutableListOf<ScannedFile>()
-        fun walk(dir: File, dirs: List<String>) {
-            if (dirs.size > 6) return
-            dir.listFiles()?.forEach { f ->
-                if (f.name.startsWith(".")) return@forEach
-                if (f.isDirectory) walk(f, dirs + f.name)
-                else if (FilenameParser.isAudio(f.name)) out += ScannedFile(Uri.fromFile(f).toString(), dirs, f.name)
-            }
-        }
-        if (root.isDirectory) walk(root, emptyList())
-        return out
-    }
+    private fun fileOf(t: Track): File = File(Uri.parse(t.uri).path ?: "")
+
+    private fun localDriveFiles(root: File): List<String> =
+        if (!root.isDirectory) emptyList()
+        else root.walkTopDown()
+            .filter { it.isFile && FilenameParser.isAudio(it.name) }
+            .map { it.relativeTo(root).invariantSeparatorsPath }
+            .toList()
 
     /** Каждая подпапка LibriVox — одна книга, её описание лежит в book.json. */
     private fun scanLibrivox(root: File, into: MutableMap<String, Book>) {
@@ -121,12 +114,12 @@ object LibraryRepository {
                 ?.sortedWith { a, b -> NaturalOrder.compare(a.name, b.name) }
                 ?.map { Track(Uri.fromFile(it).toString(), it.name) }
                 .orEmpty()
-            if (tracks.isEmpty()) return@forEach
             val author = meta.optString("author")
             val title = meta.optString("title")
             val year = if (meta.has("year")) meta.optInt("year") else null
             val key = FilenameParser.bookKey(author, year, title)
-            if (key !in into) into[key] = Book(key, author, year, title, tracks)
+            val complete = tracks.isNotEmpty() && meta.optBoolean("complete", true)
+            into.putIfAbsent(key, Book(key, author, year, title, if (complete) tracks else emptyList(), complete, meta.optString("id")))
         }
     }
 
@@ -137,6 +130,8 @@ object LibraryRepository {
                 put("author", b.author)
                 b.year?.let { put("year", it) }
                 put("title", b.title)
+                put("downloaded", b.downloaded)
+                b.librivoxId?.let { put("librivox", it) }
                 put("tracks", JSONArray().apply {
                     b.tracks.forEach { t -> put(JSONObject().put("uri", t.uri).put("name", t.name)) }
                 })
@@ -158,6 +153,8 @@ object LibraryRepository {
                     val t = tracks.getJSONObject(j)
                     Track(t.getString("uri"), t.getString("name"))
                 },
+                downloaded = o.optBoolean("downloaded", true),
+                librivoxId = o.optString("librivox").ifEmpty { null },
             )
         }
     }

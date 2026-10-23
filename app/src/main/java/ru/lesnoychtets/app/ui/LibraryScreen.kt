@@ -1,9 +1,7 @@
 package ru.lesnoychtets.app.ui
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,10 +14,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,12 +45,12 @@ fun LibraryScreen(
     onOpenAuthor: (String?) -> Unit,
     onBookStarted: () -> Unit,
     onOpenCatalog: () -> Unit,
-    onOpenSettings: () -> Unit,
 ) {
     val books by vm.books.collectAsStateWithLifecycle()
     val progress by vm.progress.collectAsStateWithLifecycle()
     val ui by vm.playerUi.collectAsStateWithLifecycle()
     val ascending by vm.sortAscending.collectAsStateWithLifecycle()
+    var askDownload by remember { mutableStateOf<Book?>(null) }
 
     val authorBooks = openAuthor?.let { a -> books.filter { it.author == a } }.orEmpty()
     if (openAuthor != null && authorBooks.isNotEmpty()) {
@@ -77,55 +80,76 @@ fun LibraryScreen(
                 }
             }
             items(sorted, key = { it.key }) { book ->
+                val p = progress[book.key]
                 BookCard(
                     book = book,
-                    progress = progress[book.key],
+                    progress = p,
                     isCurrent = ui.bookKey == book.key,
                     isPlaying = ui.bookKey == book.key && ui.isPlaying,
                     onClick = {
-                        vm.playBook(book)
-                        onBookStarted()
+                        when {
+                            book.downloaded -> {
+                                vm.playBook(book)
+                                onBookStarted()
+                            }
+                            p?.finished == true -> askDownload = book
+                        }
                     },
                 )
             }
         }
-        return
+    } else {
+        val collator = Collator.getInstance(Locale("ru"))
+        val authors = books.groupBy { it.author }.toSortedMap(collator)
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (authors.isEmpty()) {
+                item { EmptyHint("Книг пока нет. Они появятся сами, когда телефон будет подключён к домашнему Wi-Fi.") }
+            } else {
+                item { Text("Выберите писателя:", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Palette.Ink) }
+            }
+            items(authors.entries.toList(), key = { it.key }) { (author, list) ->
+                AuthorCard(author, list, progress) { onOpenAuthor(author) }
+            }
+            item {
+                BigButton(
+                    text = "🎁 БЕСПЛАТНЫЕ КНИГИ\nиз интернета",
+                    onClick = onOpenCatalog,
+                    container = Palette.AmberLight,
+                    content = Palette.AmberDark,
+                    border = Palette.AmberBorder,
+                    minHeight = 88.dp,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        }
     }
 
-    val collator = Collator.getInstance(Locale("ru"))
-    val authors = books.groupBy { it.author }.toSortedMap(collator)
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        if (authors.isEmpty()) {
-            item { EmptyHint("Книг пока нет. Нажмите «Бесплатные книги» ниже или попросите родственников добавить свои.") }
-        } else {
-            item { Text("Выберите писателя:", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Palette.Ink) }
-        }
-        items(authors.entries.toList(), key = { it.key }) { (author, list) ->
-            AuthorCard(author, list, progress) { onOpenAuthor(author) }
-        }
-        item {
-            BigButton(
-                text = "🎁 БЕСПЛАТНЫЕ КНИГИ\nиз интернета",
-                onClick = onOpenCatalog,
-                container = Palette.AmberLight,
-                content = Palette.AmberDark,
-                border = Palette.AmberBorder,
-                minHeight = 88.dp,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
-        item { SettingsEntry(alwaysOpen = authors.isEmpty(), onOpenSettings = onOpenSettings) }
+    askDownload?.let { book ->
+        AlertDialog(
+            onDismissRequest = { askDownload = null },
+            title = { Text("Книга уже прослушана", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "«${book.title}» удалена из телефона. Скачать её снова? Она загрузится при подключении к домашнему Wi-Fi.",
+                    fontSize = 19.sp,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.downloadAgain(book); askDownload = null }) { Text("СКАЧАТЬ", fontSize = 20.sp) }
+            },
+            dismissButton = { TextButton(onClick = { askDownload = null }) { Text("НЕТ", fontSize = 20.sp) } },
+        )
     }
 }
 
 @Composable
 private fun AuthorCard(author: String, books: List<Book>, progress: Map<String, Progress>, onClick: () -> Unit) {
     val years = books.mapNotNull { it.year }
-    val started = books.count { progress[it.key]?.started == true }
+    val listened = books.count { progress[it.key]?.finished == true }
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(24.dp),
@@ -141,7 +165,7 @@ private fun AuthorCard(author: String, books: List<Book>, progress: Map<String, 
                 }
                 Text(author, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = Palette.Ink, lineHeight = 30.sp)
                 Text(
-                    "Книг: ${books.size}" + if (started > 0) " • начато: $started" else "",
+                    "Книг: ${books.size}" + if (listened > 0) " • прослушано: $listened" else "",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Palette.Forest,
@@ -154,8 +178,10 @@ private fun AuthorCard(author: String, books: List<Book>, progress: Map<String, 
 
 @Composable
 private fun BookCard(book: Book, progress: Progress?, isCurrent: Boolean, isPlaying: Boolean, onClick: () -> Unit) {
+    val finished = progress?.finished == true
     val status = when {
-        progress?.finished == true -> "✓ Прослушано — нажмите, чтобы начать снова"
+        finished -> null
+        !book.downloaded -> "⏳ Скачается по домашнему Wi-Fi"
         progress?.started == true -> buildString {
             append("📍 Продолжить")
             if (book.tracks.size > 1) append(": часть ${progress.track + 1} из ${book.tracks.size},")
@@ -165,10 +191,16 @@ private fun BookCard(book: Book, progress: Progress?, isCurrent: Boolean, isPlay
         book.tracks.size > 1 -> "🆕 Начать с начала • частей: ${book.tracks.size}"
         else -> "🆕 Начать с начала"
     }
+    val dimmed = !book.downloaded && !finished
     Surface(
         onClick = onClick,
+        enabled = book.downloaded || finished,
         shape = RoundedCornerShape(20.dp),
-        color = if (isCurrent) Palette.GreenPale else Palette.Card,
+        color = when {
+            isCurrent -> Palette.GreenPale
+            finished || dimmed -> Palette.Stone
+            else -> Palette.Card
+        },
         border = BorderStroke(2.dp, if (isCurrent) Palette.Green else Palette.Border),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -195,42 +227,40 @@ private fun BookCard(book: Book, progress: Progress?, isCurrent: Boolean, isPlay
                     .weight(1f)
                     .padding(horizontal = 12.dp),
             ) {
-                Text(book.title, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Palette.Ink, lineHeight = 26.sp)
-                Text(status, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.Forest, modifier = Modifier.padding(top = 4.dp))
+                Text(
+                    book.title,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (dimmed) Palette.InkSoft else Palette.Ink,
+                    lineHeight = 26.sp,
+                )
+                if (finished) {
+                    Text(
+                        "✓ ПРОСЛУШАНО",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        modifier = Modifier
+                            .padding(top = 6.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Palette.Forest)
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                } else if (status != null) {
+                    Text(status, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = if (dimmed) Palette.InkSoft else Palette.Forest, modifier = Modifier.padding(top = 4.dp))
+                }
             }
-            Box(
-                Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(if (isPlaying) Palette.Amber else Palette.Green),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(if (isPlaying) "⏸" else "▶", fontSize = 26.sp, color = Color.White, textAlign = TextAlign.Center)
+            if (book.downloaded) {
+                Box(
+                    Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (isPlaying) Palette.Amber else Palette.Green),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(if (isPlaying) "⏸" else "▶", fontSize = 26.sp, color = Color.White, textAlign = TextAlign.Center)
+                }
             }
         }
     }
-}
-
-/**
- * Вход в настройки для родственников. Чтобы мама случайно туда не попала,
- * кнопку нужно удерживать (пока библиотека пуста — достаточно нажать).
- */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun SettingsEntry(alwaysOpen: Boolean, onOpenSettings: () -> Unit) {
-    Text(
-        if (alwaysOpen) "⚙ Настройки для родственников" else "⚙ Настройки для родственников (удерживайте)",
-        fontSize = 15.sp,
-        color = Palette.InkSoft,
-        textAlign = TextAlign.Center,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 18.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .combinedClickable(
-                onClick = { if (alwaysOpen) onOpenSettings() },
-                onLongClick = onOpenSettings,
-            )
-            .padding(14.dp),
-    )
 }

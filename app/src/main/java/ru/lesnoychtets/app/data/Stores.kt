@@ -12,10 +12,15 @@ data class Progress(
     val positionMs: Long = 0,
     val durationMs: Long = 0,
     val finished: Boolean = false,
+    /** Когда книга дослушана до конца (мс). На следующий день её файлы удаляются из телефона. */
+    val finishedAt: Long = 0,
 ) {
     val started: Boolean get() = !finished && (track > 0 || positionMs > 1000)
 
-    fun encode(): String = "$track;$positionMs;$durationMs;${if (finished) 1 else 0}"
+    /** Дослушана не сегодня — файлы больше не нужны в телефоне. */
+    fun finishedBefore(dayStartMs: Long): Boolean = finished && finishedAt < dayStartMs
+
+    fun encode(): String = "$track;$positionMs;$durationMs;${if (finished) 1 else 0};$finishedAt"
 
     companion object {
         fun decode(s: String): Progress? {
@@ -26,6 +31,7 @@ data class Progress(
                 p[1].toLongOrNull() ?: 0,
                 p[2].toLongOrNull() ?: 0,
                 p[3] == "1",
+                p.getOrNull(4)?.toLongOrNull() ?: 0,
             )
         }
     }
@@ -56,34 +62,26 @@ object ProgressStore {
 
     fun markFinished(key: String) {
         val old = get(key) ?: Progress()
-        save(key, old.copy(track = 0, positionMs = 0, finished = true))
+        save(key, old.copy(track = 0, positionMs = 0, finished = true, finishedAt = System.currentTimeMillis()))
     }
+
+    /** Начало сегодняшнего дня по времени телефона. */
+    fun todayStart(): Long = java.util.Calendar.getInstance().apply {
+        set(java.util.Calendar.HOUR_OF_DAY, 0)
+        set(java.util.Calendar.MINUTE, 0)
+        set(java.util.Calendar.SECOND, 0)
+        set(java.util.Calendar.MILLISECOND, 0)
+    }.timeInMillis
 }
 
-/** Настройки, которые задают родственники, и служебное состояние. */
+/** Служебные настройки приложения. */
 object AppPrefs {
     private lateinit var prefs: SharedPreferences
-
-    val syncRunning = MutableStateFlow(false)
-    val syncMessage = MutableStateFlow("")
 
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-        syncMessage.value = prefs.getString("sync_message", "") ?: ""
     }
-
-    var treeUri: String?
-        get() = prefs.getString("tree_uri", null)
-        set(v) = prefs.edit().putString("tree_uri", v).apply()
-
-    var driveLink: String
-        get() = prefs.getString("drive_link", "") ?: ""
-        set(v) = prefs.edit().putString("drive_link", v).apply()
-
-    var wifiOnly: Boolean
-        get() = prefs.getBoolean("wifi_only", true)
-        set(v) = prefs.edit().putBoolean("wifi_only", v).apply()
 
     var sortAscending: Boolean
         get() = prefs.getBoolean("sort_asc", true)
@@ -92,9 +90,4 @@ object AppPrefs {
     var lastBookKey: String?
         get() = prefs.getString("last_book", null)
         set(v) = prefs.edit().putString("last_book", v).apply()
-
-    fun setSyncMessage(message: String) {
-        syncMessage.value = message
-        prefs.edit().putString("sync_message", message).apply()
-    }
 }

@@ -6,7 +6,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 object Http {
-    private const val USER_AGENT = "LesnoyChtets/1.0 (Android audiobook player)"
+    private const val USER_AGENT = "Vslukh/1.0 (Android audiobook player)"
 
     private fun open(url: String): HttpURLConnection {
         var current = url

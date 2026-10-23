@@ -1,9 +1,5 @@
 package ru.lesnoychtets.app.ui
 
-import android.content.ActivityNotFoundException
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -27,12 +23,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import ru.lesnoychtets.app.data.AppPrefs
 import ru.lesnoychtets.app.data.CatalogBook
 
 /**
@@ -60,8 +54,7 @@ fun CatalogScreen(vm: MainViewModel, onBack: () -> Unit) {
             Text("🎁 Бесплатные книги", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Palette.Ink)
             Text(
                 "Русская классика из библиотеки LibriVox — записи добровольцев, свободные от авторских прав. " +
-                    "Нажмите «Скачать»: книга сохранится в телефоне и будет звучать в лесу без интернета." +
-                    if (AppPrefs.wifiOnly) " Скачивание идёт только по Wi-Fi." else "",
+                    "Нажмите «Скачать»: книга загрузится по домашнему Wi-Fi и будет звучать в лесу без интернета.",
                 fontSize = 17.sp,
                 color = Palette.InkSoft,
                 lineHeight = 22.sp,
@@ -79,7 +72,6 @@ fun CatalogScreen(vm: MainViewModel, onBack: () -> Unit) {
                 onDelete = { toDelete = book },
             )
         }
-        item { OtherSources() }
     }
 
     toDelete?.let { book ->
@@ -128,7 +120,7 @@ private fun CatalogCard(
                         fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Palette.Forest,
                     )
                     state is DownloadState.Waiting -> Text(
-                        if (AppPrefs.wifiOnly) "⏳ Ждёт Wi-Fi или очереди" else "⏳ В очереди на скачивание",
+                        "⏳ Скачается по домашнему Wi-Fi",
                         fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Palette.AmberDark,
                     )
                     else -> BigButton(
@@ -140,44 +132,5 @@ private fun CatalogCard(
                 }
             }
         }
-    }
-}
-
-/** Другие легальные бесплатные источники из исследования — открываются в своих приложениях. */
-@Composable
-private fun OtherSources() {
-    val context = LocalContext.current
-    Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Другие бесплатные библиотеки", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Palette.Ink)
-        Text(
-            "Отдельные приложения. Книги в них слушаются там же, а не в «Лесном Чтеце».",
-            fontSize = 15.sp,
-            color = Palette.InkSoft,
-        )
-        BigButton(
-            "«Свет» — аудиокниги Российской государственной библиотеки",
-            onClick = { openStore(context, "ru.rsl.svetApp") },
-            container = Palette.Card, content = Palette.Ink, border = Palette.Border, fontSize = 17.sp,
-        )
-        BigButton(
-            "«ЛитРес: Библиотека» — бесплатно по читательскому билету",
-            onClick = { openUrl(context, "https://www.litres.ru/cms/library-for-readers/") },
-            container = Palette.Card, content = Palette.Ink, border = Palette.Border, fontSize = 17.sp,
-        )
-    }
-}
-
-private fun openStore(context: Context, pkg: String) {
-    try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkg")))
-    } catch (_: ActivityNotFoundException) {
-        openUrl(context, "https://play.google.com/store/apps/details?id=$pkg")
-    }
-}
-
-private fun openUrl(context: Context, url: String) {
-    try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-    } catch (_: ActivityNotFoundException) {
     }
 }

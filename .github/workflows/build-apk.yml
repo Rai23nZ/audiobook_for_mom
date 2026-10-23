@@ -37,11 +37,11 @@ jobs:
       - name: Имя файла
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk "dist/LesnoyChtets-1.0.${VERSION_CODE}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "dist/Vslukh-1.0.${VERSION_CODE}.apk"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: LesnoyChtets-1.0.${{ github.run_number }}
+          name: Vslukh-1.0.${{ github.run_number }}
           path: dist/*.apk
 
       - name: Релиз на GitHub
@@ -49,11 +49,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: Лесной Чтец 1.0.${{ github.run_number }}
+          name: Вслух 1.0.${{ github.run_number }}
           target_commitish: ${{ github.sha }}
           make_latest: true
           files: dist/*.apk
           body: |
-            Скачайте файл LesnoyChtets-1.0.${{ github.run_number }}.apk на телефон и откройте его.
+            Скачайте файл Vslukh-1.0.${{ github.run_number }}.apk на телефон и откройте его.
             Android попросит разрешить установку из этого источника — разрешите.
             Новая версия ставится поверх старой, позиции книг сохраняются.

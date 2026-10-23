@@ -21,7 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-enum class Screen { PLAYER, LIBRARY, CATALOG, SETTINGS }
+enum class Screen { PLAYER, LIBRARY, CATALOG }
 
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
@@ -44,7 +44,7 @@ fun AppRoot(vm: MainViewModel) {
     BackHandler(enabled = screen != Screen.PLAYER) {
         when {
             screen == Screen.LIBRARY && openAuthor != null -> openAuthor = null
-            screen == Screen.CATALOG || screen == Screen.SETTINGS -> screen = Screen.LIBRARY
+            screen == Screen.CATALOG -> screen = Screen.LIBRARY
             else -> screen = Screen.PLAYER
         }
     }
@@ -92,10 +92,8 @@ fun AppRoot(vm: MainViewModel) {
                 onOpenAuthor = { openAuthor = it },
                 onBookStarted = { screen = Screen.PLAYER },
                 onOpenCatalog = { screen = Screen.CATALOG },
-                onOpenSettings = { screen = Screen.SETTINGS },
             )
             Screen.CATALOG -> CatalogScreen(vm, onBack = { screen = Screen.LIBRARY })
-            Screen.SETTINGS -> SettingsScreen(vm, onBack = { screen = Screen.LIBRARY })
         }
     }
 }

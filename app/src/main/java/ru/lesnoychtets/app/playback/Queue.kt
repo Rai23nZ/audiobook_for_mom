@@ -8,7 +8,7 @@ import ru.lesnoychtets.app.data.LibraryBuilder
 import ru.lesnoychtets.app.data.ProgressStore
 
 /**
- * Очередь воспроизведения: выбранная книга и следом остальные книги того же писателя по годам.
+ * Очередь воспроизведения: выбранная книга и следом непрослушанные книги того же писателя по годам.
  * Так стихи идут одно за другим сами, без участия слушателя.
  */
 object Queue {
@@ -23,8 +23,10 @@ object Queue {
     fun trackOf(mediaId: String?): Int = mediaId?.substringAfterLast(SEP, "")?.toIntOrNull() ?: 0
 
     fun build(all: List<Book>, start: Book): Start {
+        // Дальше идут только скачанные и ещё не прослушанные произведения этого писателя.
         val sameAuthor = all.filter { it.author == start.author }.sortedWith(LibraryBuilder.byYear)
-        val following = sameAuthor.dropWhile { it.key != start.key }.ifEmpty { listOf(start) }
+        val following = listOf(start) + sameAuthor.dropWhile { it.key != start.key }.drop(1)
+            .filter { it.downloaded && it.tracks.isNotEmpty() && ProgressStore.get(it.key)?.finished != true }
         val items = following.flatMap { book -> book.tracks.indices.map { item(book, it) } }
         val progress = ProgressStore.get(start.key)
         return if (progress == null || progress.finished) {

@@ -10,6 +10,10 @@ data class Book(
     val year: Int?,
     val title: String,
     val tracks: List<Track>,
+    /** Все файлы книги лежат в телефоне (иначе ещё не скачана или уже удалена после прослушивания). */
+    val downloaded: Boolean = true,
+    /** Идентификатор записи LibriVox, если книга из бесплатного каталога. */
+    val librivoxId: String? = null,
 )
 
 /** Найденный при сканировании аудиофайл и путь папок до него от корня источника. */

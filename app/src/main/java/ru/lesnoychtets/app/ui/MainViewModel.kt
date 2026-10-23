@@ -2,8 +2,6 @@ package ru.lesnoychtets.app.ui
 
 import android.app.Application
 import android.content.ComponentName
-import android.content.Intent
-import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.C
@@ -57,11 +55,8 @@ sealed interface DownloadState {
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     val books: StateFlow<List<Book>> = LibraryRepository.books
     val progress: StateFlow<Map<String, Progress>> = ProgressStore.all
-    val scanning = LibraryRepository.scanning
     val catalog = LibrivoxCatalog.books
     val catalogLoading = LibrivoxCatalog.loading
-    val syncRunning = AppPrefs.syncRunning
-    val syncMessage = AppPrefs.syncMessage
 
     private val player = MutableStateFlow(PlayerUi())
     val playerUi: StateFlow<PlayerUi> = player.asStateFlow()
@@ -118,12 +113,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    /** Книга, показываемая на вкладке «Слушать»: играющая сейчас или последняя. */
-    fun currentBook(): Book? =
-        LibraryRepository.find(player.value.bookKey) ?: LibraryRepository.find(AppPrefs.lastBookKey)
+    /**
+     * Книга для вкладки «Слушать»: выбранная и начатая (играет сейчас или поставлена на паузу).
+     * Дослушанная до конца книга здесь не показывается.
+     */
+    fun currentBook(): Book? {
+        val ui = player.value
+        LibraryRepository.find(ui.bookKey)?.let { b ->
+            if (b.downloaded && (ui.isPlaying || ProgressStore.get(b.key)?.finished != true)) return b
+        }
+        return LibraryRepository.find(AppPrefs.lastBookKey)
+            ?.takeIf { it.downloaded && ProgressStore.get(it.key)?.started == true }
+    }
 
     fun playBook(book: Book) {
         val c = controller ?: return
+        if (!book.downloaded || book.tracks.isEmpty()) return
         AppPrefs.lastBookKey = book.key
         val start = Queue.build(books.value, book)
         c.setMediaItems(start.items, start.index, start.positionMs)
@@ -172,28 +177,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { LibraryRepository.rescan(getApplication()) }
     }
 
-    // --- Настройки для родственников ---
-
-    fun setTreeUri(uri: Uri) {
-        val app = getApplication<Application>()
-        runCatching {
-            app.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    /**
+     * Книга прослушана и уже удалена из телефона: снимаем метку и скачиваем её снова (по Wi-Fi).
+     */
+    fun downloadAgain(book: Book) {
+        ProgressStore.save(book.key, Progress())
+        val id = book.librivoxId
+        if (id != null) {
+            LibrivoxDownloadWorker.enqueue(getApplication(), CatalogBook(id, book.author, book.title, book.year))
+        } else {
+            DriveSyncWorker.syncNow(getApplication())
         }
-        AppPrefs.treeUri = uri.toString()
-        rescan()
-    }
-
-    fun saveDriveLink(link: String) {
-        AppPrefs.driveLink = link.trim()
-        DriveSyncWorker.schedule(getApplication())
-        if (link.isNotBlank()) DriveSyncWorker.syncNow(getApplication())
-    }
-
-    fun syncNow() = DriveSyncWorker.syncNow(getApplication())
-
-    fun setWifiOnly(value: Boolean) {
-        AppPrefs.wifiOnly = value
-        DriveSyncWorker.schedule(getApplication())
     }
 
     // --- Бесплатный каталог LibriVox ---
@@ -201,8 +195,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun refreshCatalog() {
         viewModelScope.launch { LibrivoxCatalog.refresh() }
     }
-
-    fun isDownloaded(book: CatalogBook) = LibrivoxDownloader.isDownloaded(getApplication(), book.id)
 
     fun download(book: CatalogBook) = LibrivoxDownloadWorker.enqueue(getApplication(), book)
 

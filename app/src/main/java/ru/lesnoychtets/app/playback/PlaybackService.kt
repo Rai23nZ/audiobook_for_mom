@@ -150,7 +150,7 @@ class PlaybackService : MediaSessionService() {
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo,
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
-            val book = LibraryRepository.find(AppPrefs.lastBookKey)
+            val book = LibraryRepository.find(AppPrefs.lastBookKey)?.takeIf { it.downloaded && it.tracks.isNotEmpty() }
                 ?: return Futures.immediateFailedFuture(UnsupportedOperationException("Нет последней книги"))
             val start = Queue.build(LibraryRepository.books.value, book)
             return Futures.immediateFuture(

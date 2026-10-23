@@ -26,8 +26,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import ru.lesnoychtets.app.data.AppPrefs
-import ru.lesnoychtets.app.data.LibraryRepository
 
 @Composable
 fun PlayerScreen(vm: MainViewModel, onOpenLibrary: () -> Unit) {
@@ -35,7 +33,7 @@ fun PlayerScreen(vm: MainViewModel, onOpenLibrary: () -> Unit) {
     val books by vm.books.collectAsStateWithLifecycle()
     val progressMap by vm.progress.collectAsStateWithLifecycle()
 
-    val book = LibraryRepository.find(ui.bookKey) ?: books.firstOrNull { it.key == AppPrefs.lastBookKey }
+    val book = vm.currentBook()
 
     Column(
         Modifier
@@ -47,12 +45,12 @@ fun PlayerScreen(vm: MainViewModel, onOpenLibrary: () -> Unit) {
         if (book == null) {
             EmptyHint(
                 if (books.isEmpty()) {
-                    "Книг пока нет.\n\nПопросите родственников добавить аудиокниги или откройте «Бесплатные книги» во вкладке «Писатели»."
+                    "Книг пока нет.\n\nОни появятся сами, когда телефон будет подключён к домашнему Wi-Fi."
                 } else {
                     "Выберите книгу во вкладке «Писатели»."
                 },
             )
-            BigButton("📚 ВЫБРАТЬ КНИГУ", onClick = onOpenLibrary, minHeight = 96.dp, fontSize = 26.sp)
+            if (books.isNotEmpty()) BigButton("📚 ВЫБРАТЬ КНИГУ", onClick = onOpenLibrary, minHeight = 96.dp, fontSize = 26.sp)
             return@Column
         }
 

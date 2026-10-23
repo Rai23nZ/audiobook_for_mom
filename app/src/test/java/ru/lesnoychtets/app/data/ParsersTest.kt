@@ -163,3 +163,20 @@ class LibrivoxTest {
         assertEquals(200L, files[0].size)
     }
 }
+
+class ProgressTest {
+    @Test
+    fun encodesFinishedAt() {
+        val p = Progress(track = 2, positionMs = 5000, durationMs = 90000, finished = true, finishedAt = 1_700_000_000_000)
+        assertEquals(p, Progress.decode(p.encode()))
+        assertEquals(Progress(1, 2, 3, false, 0), Progress.decode("1;2;3;0"))
+    }
+
+    @Test
+    fun removedOnlyAfterTheDayOfListening() {
+        val today = 1_700_000_000_000
+        assertFalse(Progress(finished = true, finishedAt = today + 1000).finishedBefore(today))
+        assertTrue(Progress(finished = true, finishedAt = today - 1000).finishedBefore(today))
+        assertFalse(Progress(finished = false, finishedAt = 0).finishedBefore(today))
+    }
+}
