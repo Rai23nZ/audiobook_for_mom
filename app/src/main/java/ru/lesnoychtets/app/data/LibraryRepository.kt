@@ -40,16 +40,16 @@ object LibraryRepository {
 
     fun find(key: String?): Book? = key?.let { k -> state.value.firstOrNull { it.key == k } }
 
-    /** Список файлов семейной папки с последней синхронизации (относительные пути). */
-    fun readManifest(context: Context): List<String> = runCatching {
-        val arr = JSONArray(File(driveDir(context), MANIFEST).readText())
-        (0 until arr.length()).map { arr.getString(it) }
-    }.getOrDefault(emptyList())
+    /** Файлы семейной папки с последней синхронизации: относительный путь -> id файла в Drive. */
+    fun readManifest(context: Context): Map<String, String> = runCatching {
+        val o = JSONObject(File(driveDir(context), MANIFEST).readText())
+        o.keys().asSequence().associateWith { o.getString(it) }
+    }.getOrDefault(emptyMap())
 
-    fun writeManifest(context: Context, paths: Collection<String>) {
+    fun writeManifest(context: Context, files: Map<String, String>) {
         val dir = driveDir(context)
         dir.mkdirs()
-        File(dir, MANIFEST).writeText(JSONArray(paths.toList()).toString())
+        File(dir, MANIFEST).writeText(JSONObject(files).toString())
     }
 
     /** Книги семейной папки по списку путей (скачанные и нет). */
@@ -66,7 +66,7 @@ object LibraryRepository {
         mutex.withLock {
             val result = LinkedHashMap<String, Book>()
             val root = driveDir(context)
-            val paths = (readManifest(context) + localDriveFiles(root)).toSortedSet()
+            val paths = (readManifest(context).keys + localDriveFiles(root)).toSortedSet()
             driveBooks(context, paths).forEach { b ->
                 result.putIfAbsent(b.key, b.copy(downloaded = b.tracks.all { fileOf(it).let { f -> f.isFile && f.length() > 0 } }))
             }

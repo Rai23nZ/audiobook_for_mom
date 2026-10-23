@@ -50,7 +50,10 @@ fun LibraryScreen(
     val progress by vm.progress.collectAsStateWithLifecycle()
     val ui by vm.playerUi.collectAsStateWithLifecycle()
     val ascending by vm.sortAscending.collectAsStateWithLifecycle()
-    var askDownload by remember { mutableStateOf<Book?>(null) }
+    val downloads by vm.downloads.collectAsStateWithLifecycle()
+    val sync by vm.syncState.collectAsStateWithLifecycle()
+    var needWifi by remember { mutableStateOf(false) }
+    val download = { book: Book -> if (!vm.downloadBook(book)) needWifi = true }
 
     val authorBooks = openAuthor?.let { a -> books.filter { it.author == a } }.orEmpty()
     if (openAuthor != null && authorBooks.isNotEmpty()) {
@@ -80,10 +83,11 @@ fun LibraryScreen(
                 }
             }
             items(sorted, key = { it.key }) { book ->
-                val p = progress[book.key]
+                val state = downloads[vm.downloadKey(book)] ?: DownloadState.None
                 BookCard(
                     book = book,
-                    progress = p,
+                    progress = progress[book.key],
+                    download = state,
                     isCurrent = ui.bookKey == book.key,
                     isPlaying = ui.bookKey == book.key && ui.isPlaying,
                     onClick = {
@@ -92,7 +96,7 @@ fun LibraryScreen(
                                 vm.playBook(book)
                                 onBookStarted()
                             }
-                            p?.finished == true -> askDownload = book
+                            state !is DownloadState.Waiting && state !is DownloadState.Running -> download(book)
                         }
                     },
                 )
@@ -106,8 +110,9 @@ fun LibraryScreen(
             contentPadding = PaddingValues(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            item { SyncButton(sync) { if (!vm.syncNow()) needWifi = true } }
             if (authors.isEmpty()) {
-                item { EmptyHint("Книг пока нет. Они появятся сами, когда телефон будет подключён к домашнему Wi-Fi.") }
+                item { EmptyHint("Книг пока нет. Подключитесь к домашнему Wi-Fi и нажмите «Синхронизировать сейчас».") }
             } else {
                 item { Text("Выберите писателя:", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Palette.Ink) }
             }
@@ -128,21 +133,33 @@ fun LibraryScreen(
         }
     }
 
-    askDownload?.let { book ->
-        AlertDialog(
-            onDismissRequest = { askDownload = null },
-            title = { Text("Книга уже прослушана", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
-            text = {
-                Text(
-                    "«${book.title}» удалена из телефона. Скачать её снова? Она загрузится при подключении к домашнему Wi-Fi.",
-                    fontSize = 19.sp,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { vm.downloadAgain(book); askDownload = null }) { Text("СКАЧАТЬ", fontSize = 20.sp) }
-            },
-            dismissButton = { TextButton(onClick = { askDownload = null }) { Text("НЕТ", fontSize = 20.sp) } },
+    if (needWifi) WifiDialog(onDismiss = { needWifi = false })
+}
+
+/** «Синхронизировать сейчас»: обновляет список книг семейной папки (сами книги не скачиваются). */
+@Composable
+private fun SyncButton(state: SyncState, onClick: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        BigButton(
+            text = if (state is SyncState.Running) "⏳ СИНХРОНИЗАЦИЯ…" else "🔄 СИНХРОНИЗИРОВАТЬ СЕЙЧАС",
+            onClick = onClick,
+            enabled = state !is SyncState.Running,
+            container = Palette.Card,
+            content = Palette.Forest,
+            border = Palette.Green,
+            fontSize = 20.sp,
         )
+        when (state) {
+            is SyncState.Done -> Text(
+                if (state.files > 0) "✓ Список книг обновлён" else "✓ Готово. В семейной папке пока нет аудиофайлов",
+                fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.Forest,
+            )
+            SyncState.Failed -> Text(
+                "⚠ Не удалось открыть семейную папку. Попробуйте позже.",
+                fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.AmberDark,
+            )
+            else -> Unit
+        }
     }
 }
 
@@ -177,11 +194,25 @@ private fun AuthorCard(author: String, books: List<Book>, progress: Map<String, 
 }
 
 @Composable
-private fun BookCard(book: Book, progress: Progress?, isCurrent: Boolean, isPlaying: Boolean, onClick: () -> Unit) {
+private fun BookCard(
+    book: Book,
+    progress: Progress?,
+    download: DownloadState,
+    isCurrent: Boolean,
+    isPlaying: Boolean,
+    onClick: () -> Unit,
+) {
     val finished = progress?.finished == true
+    val downloadStatus = when (download) {
+        DownloadState.Waiting -> "⏳ Ждёт Wi-Fi для скачивания"
+        is DownloadState.Running ->
+            if (download.total > 1) "⏳ Скачивается: часть ${download.done + 1} из ${download.total}" else "⏳ Скачивается…"
+        DownloadState.Failed -> "⚠ Не удалось скачать. Нажмите, чтобы повторить"
+        else -> if (finished) "📥 Нажмите, чтобы скачать снова" else "📥 Нажмите, чтобы скачать"
+    }
     val status = when {
+        !book.downloaded -> downloadStatus
         finished -> null
-        !book.downloaded -> "⏳ Скачается по домашнему Wi-Fi"
         progress?.started == true -> buildString {
             append("📍 Продолжить")
             if (book.tracks.size > 1) append(": часть ${progress.track + 1} из ${book.tracks.size},")
@@ -191,10 +222,9 @@ private fun BookCard(book: Book, progress: Progress?, isCurrent: Boolean, isPlay
         book.tracks.size > 1 -> "🆕 Начать с начала • частей: ${book.tracks.size}"
         else -> "🆕 Начать с начала"
     }
-    val dimmed = !book.downloaded && !finished
+    val dimmed = !book.downloaded
     Surface(
         onClick = onClick,
-        enabled = book.downloaded || finished,
         shape = RoundedCornerShape(20.dp),
         color = when {
             isCurrent -> Palette.GreenPale
@@ -246,7 +276,8 @@ private fun BookCard(book: Book, progress: Progress?, isCurrent: Boolean, isPlay
                             .background(Palette.Forest)
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                     )
-                } else if (status != null) {
+                }
+                if (status != null) {
                     Text(status, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = if (dimmed) Palette.InkSoft else Palette.Forest, modifier = Modifier.padding(top = 4.dp))
                 }
             }

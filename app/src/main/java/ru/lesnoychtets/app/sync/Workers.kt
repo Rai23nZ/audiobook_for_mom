@@ -25,6 +25,9 @@ import java.util.concurrent.TimeUnit
 
 private const val CHANNEL_ID = "downloads"
 
+const val PROGRESS_DONE = "done"
+const val PROGRESS_TOTAL = "total"
+
 private fun foregroundInfo(context: Context, id: Int, text: String): ForegroundInfo {
     val nm = context.getSystemService(NotificationManager::class.java)
     if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(CHANNEL_ID) == null) {
@@ -58,25 +61,25 @@ private fun wifiOnly(): Constraints = Constraints.Builder()
     .setRequiredNetworkType(NetworkType.UNMETERED)
     .build()
 
-/** Синхронизация семейной папки Google Drive. */
+/** Обновление списка книг семейной папки Google Drive (без скачивания самих файлов). */
 class DriveSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        tryForeground(1001, "Обновление книг")
         return try {
-            GoogleDriveFolder.sync(applicationContext)
+            val count = GoogleDriveFolder.refresh(applicationContext)
             LibraryRepository.rescan(applicationContext)
-            Result.success()
+            Result.success(workDataOf(KEY_COUNT to count))
         } catch (e: Exception) {
             LibraryRepository.rescan(applicationContext)
-            if (runAttemptCount < 2) Result.retry() else Result.failure()
+            Result.failure()
         }
     }
 
     companion object {
         private const val PERIODIC = "drive_sync_periodic"
-        private const val NOW = "drive_sync_now"
+        const val NOW = "drive_sync_now"
+        const val KEY_COUNT = "count"
 
-        /** Проверка папки раз в 6 часов и сразу при запуске приложения — по Wi-Fi. */
+        /** Список проверяется при запуске приложения и раз в 6 часов — по Wi-Fi. */
         fun schedule(context: Context) {
             val wm = WorkManager.getInstance(context)
             val periodic = PeriodicWorkRequestBuilder<DriveSyncWorker>(6, TimeUnit.HOURS)
@@ -89,6 +92,41 @@ class DriveSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
         fun syncNow(context: Context, policy: ExistingWorkPolicy = ExistingWorkPolicy.REPLACE) {
             val request = OneTimeWorkRequestBuilder<DriveSyncWorker>().setConstraints(wifiOnly()).build()
             WorkManager.getInstance(context).enqueueUniqueWork(NOW, policy, request)
+        }
+    }
+}
+
+/** Скачивание одной книги из семейной папки — только когда её попросили кнопкой. */
+class DriveBookDownloadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result {
+        val key = inputData.getString(KEY_BOOK) ?: return Result.failure()
+        val book = LibraryRepository.find(key) ?: return Result.failure()
+        tryForeground(key.hashCode(), "Скачивается: ${book.title}")
+        return try {
+            GoogleDriveFolder.downloadBook(applicationContext, book) { done, total ->
+                setProgressAsync(workDataOf(PROGRESS_DONE to done, PROGRESS_TOTAL to total))
+            }
+            LibraryRepository.rescan(applicationContext)
+            Result.success()
+        } catch (e: Exception) {
+            LibraryRepository.rescan(applicationContext)
+            if (runAttemptCount < 3) Result.retry() else Result.failure()
+        }
+    }
+
+    companion object {
+        const val TAG = "drive_book"
+        const val KEY_TAG_PREFIX = "book:"
+        private const val KEY_BOOK = "book"
+
+        fun enqueue(context: Context, bookKey: String) {
+            val request = OneTimeWorkRequestBuilder<DriveBookDownloadWorker>()
+                .setConstraints(wifiOnly())
+                .addTag(TAG)
+                .addTag(KEY_TAG_PREFIX + bookKey)
+                .setInputData(workDataOf(KEY_BOOK to bookKey))
+                .build()
+            WorkManager.getInstance(context).enqueueUniqueWork("drive_book_$bookKey", ExistingWorkPolicy.KEEP, request)
         }
     }
 }
@@ -137,8 +175,6 @@ class LibrivoxDownloadWorker(context: Context, params: WorkerParameters) : Corou
         private const val KEY_AUTHOR = "author"
         private const val KEY_TITLE = "title"
         private const val KEY_YEAR = "year"
-        const val PROGRESS_DONE = "done"
-        const val PROGRESS_TOTAL = "total"
 
         fun workName(id: String) = "librivox_$id"
 

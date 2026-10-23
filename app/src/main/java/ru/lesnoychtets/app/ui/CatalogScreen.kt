@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.lesnoychtets.app.data.CatalogBook
+import ru.lesnoychtets.app.sync.LibrivoxDownloadWorker
 
 /**
  * Бесплатные аудиокниги LibriVox: русская классика в общественном достоянии.
@@ -41,6 +42,7 @@ fun CatalogScreen(vm: MainViewModel, onBack: () -> Unit) {
     val books by vm.books.collectAsStateWithLifecycle()
     val libraryKeys = books.map { it.key }.toSet()
     var toDelete by remember { mutableStateOf<CatalogBook?>(null) }
+    var needWifi by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { vm.refreshCatalog() }
 
@@ -63,16 +65,18 @@ fun CatalogScreen(vm: MainViewModel, onBack: () -> Unit) {
         }
         items(catalog, key = { it.id }) { book ->
             val inLibrary = book.key in libraryKeys
-            val state = downloads[book.id] ?: DownloadState.None
+            val state = downloads[LibrivoxDownloadWorker.ID_TAG_PREFIX + book.id] ?: DownloadState.None
             CatalogCard(
                 book = book,
                 inLibrary = inLibrary,
                 state = state,
-                onDownload = { vm.download(book) },
+                onDownload = { if (!vm.download(book)) needWifi = true },
                 onDelete = { toDelete = book },
             )
         }
     }
+
+    if (needWifi) WifiDialog(onDismiss = { needWifi = false })
 
     toDelete?.let { book ->
         AlertDialog(
@@ -120,7 +124,7 @@ private fun CatalogCard(
                         fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Palette.Forest,
                     )
                     state is DownloadState.Waiting -> Text(
-                        "⏳ Скачается по домашнему Wi-Fi",
+                        "⏳ Ждёт Wi-Fi для скачивания",
                         fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Palette.AmberDark,
                     )
                     else -> BigButton(

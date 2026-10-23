@@ -57,15 +57,13 @@ object GoogleDriveFolder {
             .replace("&nbsp;", " ")
             .replace("&amp;", "&")
 
-    /** Результат синхронизации (для журнала). */
-    data class SyncResult(val total: Int, val downloaded: Int, val removed: Int)
-
     /**
-     * Повторяет содержимое семейной папки в памяти телефона: докачивает новые аудиофайлы
-     * и удаляет те, что убрали из облака. Книги, дослушанные не сегодня, заново не скачиваются.
+     * Обновляет список книг семейной папки. Сами файлы не скачиваются — только по кнопке
+     * (см. [downloadBook]). Файлы, убранные из облака, удаляются и с телефона.
      * Если список получить не удалось, бросается ошибка и ничего не удаляется.
+     * Возвращает число аудиофайлов в папке.
      */
-    fun sync(context: Context, folderId: String = FAMILY_FOLDER_ID): SyncResult {
+    fun refresh(context: Context, folderId: String = FAMILY_FOLDER_ID): Int {
         val remote = LinkedHashMap<String, String>() // относительный путь -> id файла
         fun collect(id: String, prefix: String, depth: Int) {
             list(id).forEach { e ->
@@ -78,32 +76,32 @@ object GoogleDriveFolder {
             }
         }
         collect(folderId, "", 0)
-        LibraryRepository.writeManifest(context, remote.keys)
+        LibraryRepository.writeManifest(context, remote)
 
         val root = LibraryRepository.driveDir(context)
-        val today = ProgressStore.todayStart()
-        val skip = LibraryRepository.driveBooks(context, remote.keys)
-            .filter { ProgressStore.get(it.key)?.finishedBefore(today) == true }
-            .flatMap { b -> b.tracks.map { Uri.parse(it.uri).path } }
-            .toSet()
-
-        var downloaded = 0
-        remote.forEach { (path, id) ->
-            val target = File(root, path)
-            if (target.path in skip || (target.exists() && target.length() > 0)) return@forEach
-            Http.download(downloadUrl(id), target)
-            downloaded++
-        }
-
-        var removed = 0
         root.walkBottomUp().forEach { f ->
             val rel = f.relativeTo(root).invariantSeparatorsPath
             if (f.isFile && (f.name.endsWith(".part") || (FilenameParser.isAudio(f.name) && rel !in remote))) {
-                if (f.delete() && !f.name.endsWith(".part")) removed++
+                f.delete()
             } else if (f.isDirectory && f != root && f.list()?.isEmpty() == true) {
                 f.delete()
             }
         }
-        return SyncResult(remote.size, downloaded, removed)
+        return remote.size
+    }
+
+    /** Скачивает в телефон все файлы одной книги из семейной папки. */
+    fun downloadBook(context: Context, book: Book, onProgress: (done: Int, total: Int) -> Unit) {
+        val root = LibraryRepository.driveDir(context)
+        val manifest = LibraryRepository.readManifest(context)
+        book.tracks.forEachIndexed { i, t ->
+            onProgress(i, book.tracks.size)
+            val target = File(Uri.parse(t.uri).path ?: return@forEachIndexed)
+            if (target.exists() && target.length() > 0) return@forEachIndexed
+            val id = manifest[target.relativeTo(root).invariantSeparatorsPath]
+                ?: throw IOException("Файл ${target.name} больше нет в папке")
+            Http.download(downloadUrl(id), target)
+        }
+        onProgress(book.tracks.size, book.tracks.size)
     }
 }
